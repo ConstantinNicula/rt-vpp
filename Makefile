@@ -8,7 +8,6 @@ CFLAGS = -g -Wall
 TARGET = build/$(TARGET_NAME)
 
 C_FILES = $(wildcard src/*.c)
-HEADERS = $(wildcard src/*.h)
 OBJECTS = $(patsubst src/%.c, build/%.o, $(C_FILES))
 
 .PHONY: default all clean 
@@ -16,7 +15,7 @@ OBJECTS = $(patsubst src/%.c, build/%.o, $(C_FILES))
 all: default 
 default: build_loc $(TARGET)
 
-$(OBJECTS): $(C_FILES) $(HEADERS)
+build/%.o: src/%.c 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJECTS)
