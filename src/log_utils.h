@@ -4,16 +4,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <stdlib.h>
 
 #define ERROR(msg) do {\
         fprintf(stderr, "[%s] ERROR: " msg "%s\n", __FUNCTION__, strerror(errno));\
-        exit(EXIT_FAILURE);\
     } while(0)
 
 #define ERROR_FMT(fmt, args...) do {\
         fprintf(stderr, "[%s] ERROR: " fmt "%s\n", __FUNCTION__, args, strerror(errno));\
-        exit(EXIT_FAILURE);\
     } while(0)
 
 #define DEBUG_PRINT(msg) do {\
