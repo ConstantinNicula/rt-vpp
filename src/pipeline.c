@@ -1,11 +1,16 @@
 #include "pipeline.h"
 #include "cam_utils.h"
+#include "glib-object.h"
+#include "gst/gstelementfactory.h"
+#include "gst/gstutils.h"
 #include "log_utils.h"
 #include "shader_utils.h"
 
 static int create_decoding_stage(PipelineHandle *handle, CamParams *cam_params);
 static int create_processing_stage(PipelineHandle *handle);
 static int create_encoding_stage(PipelineHandle *handle);
+static int create_output_stage(PipelineHandle *handle);
+
 
 static GstElement* create_caps_filter(const char* type, const char* name, const char* format, 
                                         int width, int height, int fr_num, int fr_denom);
@@ -25,23 +30,32 @@ int create_pipeline(CamParams *cam_params, PipelineHandle *handle) {
     int create_res = 0;
     gboolean link_res = FALSE;
 
-    /* Create the empty pipeline */
+    /* 1) Create the empty pipeline */
     handle->pipeline = gst_pipeline_new("my-test-pipeline");
-    CHECK(handle->pipeline != NULL, "Failed to create pipeline \n", RET_ERR);
+    CHECK(handle->pipeline != NULL, "Failed to create pipeline", RET_ERR);
 
-    /* Create stages */    
+    /* 2) Create stages */    
     create_res = create_decoding_stage(handle, cam_params);
-    CHECK(create_res == 0, "Failed to create decoding stage of pipeline\n", RET_ERR); 
+    CHECK(create_res == 0, "Failed to create decoding stage of pipeline", RET_ERR); 
 
     create_res = create_processing_stage(handle);
     CHECK(create_res == 0, "Failed to create processing stage of pipeline", RET_ERR);
 
     create_res = create_encoding_stage(handle);
-    CHECK(create_res == 0, "Failed to create encoding stage of pipeline\n", RET_ERR);
+    CHECK(create_res == 0, "Failed to create encoding stage of pipeline", RET_ERR);
 
-    /* Link stages */
+    create_res = create_output_stage(handle);
+    CHECK(create_res == 0, "Failed to create output stage of pipeline", RET_ERR);
+
+    /* 3) Link stages */
     link_res = gst_element_link(handle->dec.out_caps_filter, handle->proc.uploader);  
-    CHECK(link_res == TRUE, "Failed to link decode and processing stages of the pipeline\n", RET_ERR);
+    CHECK(link_res == TRUE, "Failed to link decode and processing stages of the pipeline", RET_ERR);
+
+    link_res = gst_element_link(handle->proc.downloader, handle->enc.converter);
+    CHECK(link_res == TRUE, "Failed to link processing and encoding stages of the pipeline", RET_ERR);
+
+    link_res = gst_element_link(handle->enc.encoder, handle->out.tee);
+    CHECK(link_res == TRUE, "Failed to link encoding and output stages of the pipeline", RET_ERR);
 
     return RET_OK;
 }
@@ -69,24 +83,24 @@ static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) 
                             cam_params->width, cam_params->height, 
                             cam_params->fr_num, cam_params->fr_denom);
             handle->dec.decoder = gst_element_factory_make("avdec_mjpeg", "camera-decoder");
-            CHECK(handle->dec.decoder != NULL, "Failed to allocate camera decoder\n", RET_ERR);
+            CHECK(handle->dec.decoder != NULL, "Failed to allocate camera decoder", RET_ERR);
             break;
         default:
-            ERROR("Failed to create caps filter! Unsupported pixel format\n");
+            ERROR("Failed to create caps filter! Unsupported pixel format");
             return RET_ERR;
     }
-    CHECK(handle->dec.cam_caps_filter != NULL, "Failed to allocate camera capsfilter\n", RET_ERR);
+    CHECK(handle->dec.cam_caps_filter != NULL, "Failed to allocate camera capsfilter", RET_ERR);
 
     /* 3) Create video converter */
     handle->dec.converter = gst_element_factory_make("videoconvert", "camera-convert");
-    CHECK(handle->dec.converter != NULL, "Failed to allocate camera converter\n", RET_ERR);
+    CHECK(handle->dec.converter != NULL, "Failed to allocate camera converter", RET_ERR);
 
     /* 4) Create output capsfilter */ 
     handle->dec.out_caps_filter = create_caps_filter("video/x-raw", "output-capsfilter",
                                 "RGBA", 
                                 cam_params->width, cam_params->height,
                                 cam_params->fr_num, cam_params->fr_denom);
-    CHECK(handle->dec.out_caps_filter != NULL, "Failed to allocate output camera capsfilter\n", RET_ERR);
+    CHECK(handle->dec.out_caps_filter != NULL, "Failed to allocate output camera capsfilter", RET_ERR);
     
     /* 5) Add front end elements to pipeline */ 
     gst_bin_add_many(GST_BIN(handle->pipeline), 
@@ -112,7 +126,7 @@ static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) 
                               handle->dec.out_caps_filter, NULL);
     }
     DEBUG_PRINT_EXPR(res);
-    CHECK(res == TRUE, "Failed to link elements\n", RET_ERR);
+    CHECK(res == TRUE, "Failed to link elements", RET_ERR);
         
     return RET_OK;
 }
@@ -120,7 +134,7 @@ static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) 
 static int create_processing_stage(PipelineHandle *handle) {
     /* 1) Create gluploader */
     handle->proc.uploader = gst_element_factory_make("glupload", "proc-upload");
-    CHECK(handle->proc.uploader != NULL, "Failed to allocate glupload element\n", RET_ERR);
+    CHECK(handle->proc.uploader != NULL, "Failed to allocate glupload element", RET_ERR);
 
     /* 2) Create glshader instances */
     /* TODO: handle multiple shaders */ 
@@ -129,7 +143,7 @@ static int create_processing_stage(PipelineHandle *handle) {
 
     /* 3) Create gldownloader*/
     handle->proc.downloader = gst_element_factory_make("gldownload", "proc-download");
-    CHECK(handle->proc.downloader != NULL, "Failed to allocate gldownlaod element\n", RET_ERR);
+    CHECK(handle->proc.downloader != NULL, "Failed to allocate gldownlaod element", RET_ERR);
 
     /* 4) Add all elements */
     gst_bin_add(GST_BIN(handle->pipeline), handle->proc.uploader);
@@ -147,12 +161,55 @@ static int create_processing_stage(PipelineHandle *handle) {
 }
 
 static int create_encoding_stage(PipelineHandle *handle) {
+    /* 1) Create converter stage */
+    handle->enc.converter = gst_element_factory_make("videoconvert", "enc-convert");
+    CHECK(handle->enc.converter != NULL, "Failed to allocate videoconvert element", RET_ERR);
+
+    /* 2) Create encoder stage */ 
+    handle->enc.encoder = gst_element_factory_make("x264enc", "enc-h264");
+    CHECK(handle->enc.encoder != NULL, "Failed to allocate x264enc element", RET_ERR);
+    g_object_set(G_OBJECT(handle->enc.encoder), 
+                "bitrate", 500, 
+                "tune", 4, // zerolatency mode 
+                "speed-preset", 2, // superfast mode  
+                NULL);
+    /* 3) Add elements */
+    gst_bin_add_many(GST_BIN(handle->pipeline), handle->enc.converter, handle->enc.encoder, NULL);
+    
+    /* 4) Link elements */
+    gboolean ret = gst_element_link(handle->enc.converter, handle->enc.encoder);
+    CHECK(ret != FALSE, "Failed to link elements in encoding stage", RET_ERR);
     return RET_OK;
 }
 
-static void debug_print_caps(GstElement* elem, const char* pad) {
-    GstCaps *caps = gst_pad_query_caps(gst_element_get_static_pad(elem, pad), NULL);
-    DEBUG_PRINT_FMT("%s caps: %s\n", pad, gst_caps_to_string(caps));
+static int create_output_stage(PipelineHandle *handle) {
+    /* 1) Create tee splitter */
+    handle->out.tee = gst_element_factory_make("tee", "disp-tee");
+    CHECK(handle->out.tee != NULL, "Failed to allocate tee element", RET_ERR);
+    /* TODO: Create V4L2 sink */
+
+    /* 2.1) Create display decoder */
+    handle->out.disp_decoder = gst_element_factory_make("avdec_h264", "disp-decoder");
+    CHECK(handle->out.disp_decoder != NULL, "Failed to allocate avdec_h264 element", RET_ERR);
+
+    /* 2.2) Create display converter */
+    handle->out.disp_converter = gst_element_factory_make("videoconvert", "disp-converter");
+    CHECK(handle->out.disp_converter != NULL, "Failed to allocate videoconvert element", RET_ERR);
+
+    /* 2.3) Create display sink */
+    handle->out.disp_sink = gst_element_factory_make("autovideosink", "disp-autovideosink");
+    CHECK(handle->out.disp_sink != NULL, "Failed to allocate autovideosink element", RET_ERR);
+
+    /* 3) Add elements */
+    gst_bin_add_many(GST_BIN(handle->pipeline), handle->out.tee, handle->out.disp_decoder, 
+                    handle->out.disp_converter, handle->out.disp_sink, NULL);
+    
+    /* 4) Link elements */
+    gboolean ret = gst_element_link_many(handle->out.tee, handle->out.disp_decoder, 
+                                        handle->out.disp_converter, handle->out.disp_sink, NULL);
+    CHECK(ret != FALSE, "Failed to link elements in output (display stage) ", RET_ERR);
+    
+    return RET_OK;
 }
 
 static GstElement* create_caps_filter(const char* type, const char* name, const char* format, 
@@ -162,7 +219,7 @@ static GstElement* create_caps_filter(const char* type, const char* name, const 
 
     /* Create caps filter element */
     caps_filter = gst_element_factory_make("capsfilter", name);
-    CHECK(caps_filter != NULL, "Failed to create caps filter element\n", NULL);
+    CHECK(caps_filter != NULL, "Failed to create caps filter element", NULL);
     
 
     /* Create a caps structure */
@@ -185,12 +242,18 @@ static GstElement* create_shader(const char* shader_path, const char* shader_nam
     
     /* Load shader code. */
     shader_code = load_shader(shader_path);
-    CHECK(shader_code != NULL, "Failed to load shader code!\n", NULL);
+    CHECK(shader_code != NULL, "Failed to load shader code!", NULL);
 
     /* Crate shader object and set properties */
     shader = gst_element_factory_make("glshader", shader_name); 
-    CHECK(shader != NULL, "Failed to create shader element \n", NULL);
+    CHECK(shader != NULL, "Failed to create shader element", NULL);
     g_object_set(G_OBJECT(shader), "fragment", shader_code, NULL);
 
     return shader;
 }
+
+static void debug_print_caps(GstElement* elem, const char* pad) {
+    GstCaps *caps = gst_pad_query_caps(gst_element_get_static_pad(elem, pad), NULL);
+    DEBUG_PRINT_FMT("%s caps: %s\n", pad, gst_caps_to_string(caps));
+}
+

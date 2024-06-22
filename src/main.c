@@ -23,22 +23,6 @@ int test_pipeline(int argc, char** argv) {
     if (create_pipeline(&cam_params, &handle) == -1) {
         return -1;
     }
-    GstElement* conv = gst_element_factory_make("videoconvert", "conv");
-    GstElement* sink = gst_element_factory_make("autovideosink", "sink");
-   
-    if (!conv || !sink) {
-        ERROR("Not all elements could be created. \n");
-        return -1;
-    }
-
-    /* Build the pipeline */ 
-    gst_bin_add_many(GST_BIN(handle.pipeline), conv, sink, NULL);
-    if (gst_element_link_many(handle.proc.downloader, conv, sink, NULL) != TRUE) {
-        ERROR("Elements could not be linked");
-        gst_object_unref(handle.pipeline);
-        return -1;
-    }
-
    
     /* Start playing */
     ret = gst_element_set_state(handle.pipeline, GST_STATE_PLAYING);
