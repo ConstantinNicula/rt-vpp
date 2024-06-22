@@ -1,7 +1,10 @@
 #ifndef __CAM_UTILS_H___
 #define __CAM_UTILS_H___
 
-struct cam_params {
+typedef struct _CamParams {
+    /* Source device */
+    char* dev_path;
+
     /* Frame properties (pixel format & frame dimensions)*/
     int width;
     int height;
@@ -10,8 +13,10 @@ struct cam_params {
     /* Stream properties (framerate)*/
     int fr_num;
     int fr_denom;  
-};
+} CamParams;
 
-int read_camera_default_params(const char* dev_path, struct cam_params *out_params);
+
+int read_cam_params(const char* dev_path, CamParams *out_params);
+void cleanup_cam_params(CamParams* params);
 
 #endif

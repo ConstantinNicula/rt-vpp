@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -7,10 +8,11 @@
 #include "cam_utils.h"
 #include "log_utils.h"
 
-
-int read_camera_default_params(const char* dev_path, struct cam_params *out_params) {
+int read_cam_params(const char* dev_path, CamParams *out_params) {
     struct v4l2_format fmt = {0};
     struct v4l2_streamparm strprm = {0};
+
+    out_params->dev_path = strdup(dev_path);
 
     DEBUG_PRINT_FMT("Opening device %s..\n", dev_path);
     int dev_fd = open(dev_path, O_RDWR);
@@ -48,4 +50,8 @@ int read_camera_default_params(const char* dev_path, struct cam_params *out_para
 
     close(dev_fd);
     return 0;
+}
+
+void cleanup_cam_params(CamParams *params) {
+    free(params->dev_path);
 }

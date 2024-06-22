@@ -1,54 +1,56 @@
 #include "cam_utils.h"
+#include "pipeline.h"
+
 #include "gst/gstclock.h"
 #include "gst/gstelement.h"
 #include "gst/gstmessage.h"
 #include "log_utils.h"
 #include <gst/gst.h>
 
-const char* pipeline_config = "playbin uri=https://gstreamer.freedesktop.org/data/media/sintel_trailer-480p.webm";
-
 int test_pipeline(int argc, char** argv) {
-    GstElement *pipeline, *source, *sink;
     GstBus *bus;
     GstMessage *msg;
     GstStateChangeReturn ret;
 
+    PipelineHandle handle;
+    CamParams cam_params  = {0};
+
     /* Initialize GStreamer */
     gst_init(&argc, &argv);
 
+    /* Read camera parameters */
+    const char* dev = "/dev/video0";
+    read_cam_params(dev, &cam_params);
+ 
     /* Create the elements */
-    source = gst_element_factory_make("videotestsrc", "source");
-    sink = gst_element_factory_make("autovideosink", "sink");
-
-    /* Create the empty pipeline */
-    pipeline = gst_pipeline_new("test-pipeline");
-    
-    if (!pipeline || !source || !sink) {
+    create_pipeline(&cam_params, &handle);
+    GstElement* conv = gst_element_factory_make("videoconvert", "conv");
+    GstElement* sink = gst_element_factory_make("autovideosink", "sink");
+   
+    if (!conv || !sink) {
         ERROR("Not all elements could be created. \n");
         return -1;
     }
 
     /* Build the pipeline */ 
-    gst_bin_add_many(GST_BIN(pipeline), source, sink, NULL);
-    if (gst_element_link(source, sink) != TRUE) {
+    gst_bin_add_many(GST_BIN(handle.pipeline), conv, sink, NULL);
+    if (gst_element_link_many(handle.dec.cam_caps_filter, conv, sink, NULL) != TRUE) {
         ERROR("Elements could not be linked");
-        gst_object_unref(pipeline);
+        gst_object_unref(handle.pipeline);
         return -1;
     }
 
-    /* Modify the source's properties */ 
-    g_object_set(source, "pattern", 0, NULL);
-    
+   
     /* Start playing */
-    ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    ret = gst_element_set_state(handle.pipeline, GST_STATE_PLAYING);
     if (ret == GST_STATE_CHANGE_FAILURE) {
         ERROR("Unable to set the pipeline to the playing state.\n");
-        gst_object_unref(pipeline);
+        gst_object_unref(handle.pipeline);
         return -1;
     }
 
     /* Wait until error or EOS */
-    bus = gst_element_get_bus(pipeline);
+    bus = gst_element_get_bus(handle.pipeline);
     msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_ERROR| GST_MESSAGE_EOS);
 
     /* Parse message */ 
@@ -77,14 +79,11 @@ int test_pipeline(int argc, char** argv) {
 
     /* Free resources */
     gst_object_unref(bus);
-    gst_element_set_state(pipeline, GST_STATE_NULL);
-    gst_object_unref(pipeline);
+    gst_element_set_state(handle.pipeline, GST_STATE_NULL);
+    gst_object_unref(handle.pipeline);
     return 0;
 }  
 
 int main(int argc, char** argv) {
-    const char* dev = "/dev/video0";
-    struct cam_params params  = {0};
-    read_camera_default_params(dev, &params);
-    return test_pipeline(argc, argv);
+   return test_pipeline(argc, argv);
 }
