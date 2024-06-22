@@ -12,6 +12,6 @@ struct cam_params {
     int fr_denom;  
 };
 
-void read_camera_default_params(const char* dev_path, struct cam_params *out_params);
+int read_camera_default_params(const char* dev_path, struct cam_params *out_params);
 
 #endif

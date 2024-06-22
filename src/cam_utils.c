@@ -1,26 +1,29 @@
-#include "cam_utils.h"
-#include "log_utils.h"
-
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
+#include "cam_utils.h"
+#include "log_utils.h"
 
-void read_camera_default_params(const char* dev_path, struct cam_params *out_params) {
+
+int read_camera_default_params(const char* dev_path, struct cam_params *out_params) {
     struct v4l2_format fmt = {0};
     struct v4l2_streamparm strprm = {0};
 
     DEBUG_PRINT_FMT("Opening device %s..\n", dev_path);
     int dev_fd = open(dev_path, O_RDWR);
-    if (dev_fd == -1)     
+    if (dev_fd == -1) {     
         ERROR_FMT("Failed to open device %s: ", dev_path);
-        
+        return -1;
+    } 
     /* Read the current frame format */ 
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(dev_fd, VIDIOC_G_FMT, &fmt) == -1) {
-        close(dev_fd);
         ERROR("IOCTL: VIDIOC_G_FMT request failed \n");
+        close(dev_fd);
+        return -1;
     }
 
     /* Extract pixel format info */
@@ -31,8 +34,9 @@ void read_camera_default_params(const char* dev_path, struct cam_params *out_par
     /* Read framerate info*/
     strprm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(dev_fd, VIDIOC_G_PARM, &strprm) == -1) {
-        close(dev_fd);
         ERROR("IOCTL: VIDIOC_G_PARM request failed \n");
+        close(dev_fd);
+        return -1;
     }
 
     /* Extract framerate info*/
@@ -43,4 +47,5 @@ void read_camera_default_params(const char* dev_path, struct cam_params *out_par
         out_params->width, out_params->height, out_params->pixelformat, out_params->fr_denom, out_params->fr_num);
 
     close(dev_fd);
+    return 0;
 }
