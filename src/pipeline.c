@@ -206,11 +206,7 @@ static int create_output_stage(PipelineHandle *handle) {
     handle->out.dev_queue = gst_element_factory_make("queue", "disp-devqueue");
     CHECK(handle->out.dev_queue != NULL, "Failed to allocate queue element", RET_ERR);
 
-    // /* 2.a2) Create stream parser */
-    // handle->out.dev_parser = gst_element_factory_make("h264parse", "disp-parser");
-    // CHECK(handle->out.dev_parser != NULL, "Failed to allocate h264 parser element", RET_ERR);
-
-    /* 2.a3) Create V4L2 sink */
+    /* 2.a2) Create V4L2 sink */
     // TO DO: Fix hardcoding
     handle->out.dev_sink = gst_element_factory_make("v4l2sink", "disp-devsink");
     CHECK(handle->out.dev_sink != NULL, "Failed to allocate v4l2sink element", RET_ERR);
@@ -235,7 +231,7 @@ static int create_output_stage(PipelineHandle *handle) {
 
     /* 3) Add elements */
     gst_bin_add_many(GST_BIN(handle->pipeline), handle->out.tee, 
-                    handle->out.dev_queue, /*handle->out.dev_parser, */ handle->out.dev_sink, NULL);
+                    handle->out.dev_queue, handle->out.dev_sink, NULL);
 
     gst_bin_add_many(GST_BIN(handle->pipeline), handle->out.disp_queue, handle->out.disp_decoder, 
                     handle->out.disp_converter, handle->out.disp_sink, NULL);
@@ -245,8 +241,7 @@ static int create_output_stage(PipelineHandle *handle) {
                                 handle->out.disp_converter, handle->out.disp_sink, NULL);
     CHECK(ret != FALSE, "Failed to link elements in output stage: screen sink", RET_ERR);
 
-    ret = gst_element_link_many(handle->out.tee, handle->out.dev_queue, 
-                                /*handle->out.dev_parser,*/ handle->out.dev_sink, NULL);
+    ret = gst_element_link_many(handle->out.tee, handle->out.dev_queue, handle->out.dev_sink, NULL);
     CHECK(ret != FALSE, "Failed to link elements in output stage: dev sink", RET_ERR);
 
     return RET_OK;

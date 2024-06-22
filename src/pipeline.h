@@ -53,7 +53,6 @@ typedef struct _PipelineHandle {
         GstElement* tee;
         /* Path 1: V4L2 sink */
         GstElement* dev_queue;
-        GstElement* dev_parser;
         GstElement* dev_sink;
 
         /* Path 2: Decoding stage H264 & display sink */
