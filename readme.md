@@ -58,3 +58,27 @@ Format Video Capture:
     Quantization      : Default (maps to Limited Range)
     Flags             : 
 ```
+
+## 2. Creating a V4L2 loopback device node
+
+This will be used as the output for the pipeline. You can create loopback device by running the following command:
+
+```bash
+    sudo modprobe v4l2loopback devices=1
+```
+
+Check `/dev/video*` for new devices.
+
+## 3. Connecting to V4L2 loopback device node
+
+You can preview the virtual camera data using gstreamer:
+
+```bash
+    gst-launch-1.0 v4l2src device=/dev/video2 ! h264parse ! avdec_h264 ! videoconvert ! autovideosink sync=false
+```
+
+Or alternatively using ffplay (Note: I haven't figure out how to remove ffplay buffering delays): 
+
+```bash
+    ffplay /dev/video2
+```

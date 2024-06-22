@@ -41,6 +41,10 @@ typedef struct _PipelineHandle {
         GstElement* converter; 
         /* H264 encoding*/ 
         GstElement* encoder;
+        /* Parser */ 
+        GstElement* parser;
+        /* output caps filter*/
+        GstElement* out_caps_filter;
     } enc;
 
     /* Debug display stage elements*/
@@ -48,9 +52,12 @@ typedef struct _PipelineHandle {
         /* Splitter node for two output paths */ 
         GstElement* tee;
         /* Path 1: V4L2 sink */
+        GstElement* dev_queue;
+        GstElement* dev_parser;
         GstElement* dev_sink;
 
         /* Path 2: Decoding stage H264 & display sink */
+        GstElement* disp_queue;
         GstElement* disp_decoder;
         GstElement* disp_converter;
         GstElement* disp_sink; 

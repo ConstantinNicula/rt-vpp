@@ -54,7 +54,7 @@ int create_pipeline(CamParams *cam_params, PipelineHandle *handle) {
     link_res = gst_element_link(handle->proc.downloader, handle->enc.converter);
     CHECK(link_res == TRUE, "Failed to link processing and encoding stages of the pipeline", RET_ERR);
 
-    link_res = gst_element_link(handle->enc.encoder, handle->out.tee);
+    link_res = gst_element_link(handle->enc.out_caps_filter, handle->out.tee);
     CHECK(link_res == TRUE, "Failed to link encoding and output stages of the pipeline", RET_ERR);
 
     return RET_OK;
@@ -173,42 +173,82 @@ static int create_encoding_stage(PipelineHandle *handle) {
                 "tune", 4, // zerolatency mode 
                 "speed-preset", 2, // superfast mode  
                 NULL);
-    /* 3) Add elements */
-    gst_bin_add_many(GST_BIN(handle->pipeline), handle->enc.converter, handle->enc.encoder, NULL);
     
-    /* 4) Link elements */
-    gboolean ret = gst_element_link(handle->enc.converter, handle->enc.encoder);
+    /* 3) Create parser */
+    handle->enc.parser = gst_element_factory_make("h264parse", "enc-parser");
+    CHECK(handle->enc.encoder != NULL, "Failed to allocate h264parse", RET_ERR);
+
+    /* 4) Create caps filter */ 
+    handle->enc.out_caps_filter = gst_element_factory_make("capsfilter", "enc-capsfilter");
+    CHECK(handle->enc.out_caps_filter != NULL, "Failed to allocate capsfilter", RET_ERR);
+    GstCaps* caps = gst_caps_from_string("video/x-h264,stream-format=byte-stream");
+    g_object_set(G_OBJECT(handle->enc.out_caps_filter), "caps", caps, NULL);
+
+    /* 5) Add elements */
+    gst_bin_add_many(GST_BIN(handle->pipeline), handle->enc.converter, handle->enc.encoder, 
+                    handle->enc.parser, handle->enc.out_caps_filter, NULL);
+    
+    /* 6) Link elements */
+    gboolean ret = gst_element_link_many(handle->enc.converter, handle->enc.encoder, 
+                            handle->enc.parser, handle->enc.out_caps_filter, NULL);
     CHECK(ret != FALSE, "Failed to link elements in encoding stage", RET_ERR);
     return RET_OK;
 }
 
 static int create_output_stage(PipelineHandle *handle) {
+    gboolean ret = FALSE;
     /* 1) Create tee splitter */
     handle->out.tee = gst_element_factory_make("tee", "disp-tee");
     CHECK(handle->out.tee != NULL, "Failed to allocate tee element", RET_ERR);
-    /* TODO: Create V4L2 sink */
 
-    /* 2.1) Create display decoder */
+    /* Device path */
+    /* 2.a1) Create dev queue */
+    handle->out.dev_queue = gst_element_factory_make("queue", "disp-devqueue");
+    CHECK(handle->out.dev_queue != NULL, "Failed to allocate queue element", RET_ERR);
+
+    // /* 2.a2) Create stream parser */
+    // handle->out.dev_parser = gst_element_factory_make("h264parse", "disp-parser");
+    // CHECK(handle->out.dev_parser != NULL, "Failed to allocate h264 parser element", RET_ERR);
+
+    /* 2.a3) Create V4L2 sink */
+    // TO DO: Fix hardcoding
+    handle->out.dev_sink = gst_element_factory_make("v4l2sink", "disp-devsink");
+    CHECK(handle->out.dev_sink != NULL, "Failed to allocate v4l2sink element", RET_ERR);
+    g_object_set(G_OBJECT(handle->out.dev_sink), "device", "/dev/video2", NULL);
+    
+    /* Display path */
+    /* 2.b1) Create display decoder */
+    handle->out.disp_queue = gst_element_factory_make("queue", "disp-dispqueue");
+    CHECK(handle->out.disp_queue != NULL, "Failed to allocate queue element", RET_ERR);
+
+    /* 2.b2) Create display decoder */
     handle->out.disp_decoder = gst_element_factory_make("avdec_h264", "disp-decoder");
     CHECK(handle->out.disp_decoder != NULL, "Failed to allocate avdec_h264 element", RET_ERR);
 
-    /* 2.2) Create display converter */
+    /* 2.b3) Create display converter */
     handle->out.disp_converter = gst_element_factory_make("videoconvert", "disp-converter");
     CHECK(handle->out.disp_converter != NULL, "Failed to allocate videoconvert element", RET_ERR);
 
-    /* 2.3) Create display sink */
+    /* 2.b4) Create display sink */
     handle->out.disp_sink = gst_element_factory_make("autovideosink", "disp-autovideosink");
     CHECK(handle->out.disp_sink != NULL, "Failed to allocate autovideosink element", RET_ERR);
 
     /* 3) Add elements */
-    gst_bin_add_many(GST_BIN(handle->pipeline), handle->out.tee, handle->out.disp_decoder, 
+    gst_bin_add_many(GST_BIN(handle->pipeline), handle->out.tee, 
+                    handle->out.dev_queue, /*handle->out.dev_parser, */ handle->out.dev_sink, NULL);
+
+    gst_bin_add_many(GST_BIN(handle->pipeline), handle->out.disp_queue, handle->out.disp_decoder, 
                     handle->out.disp_converter, handle->out.disp_sink, NULL);
     
     /* 4) Link elements */
-    gboolean ret = gst_element_link_many(handle->out.tee, handle->out.disp_decoder, 
-                                        handle->out.disp_converter, handle->out.disp_sink, NULL);
-    CHECK(ret != FALSE, "Failed to link elements in output (display stage) ", RET_ERR);
-    
+    ret = gst_element_link_many(handle->out.tee, handle->out.disp_queue, handle->out.disp_decoder, 
+                                handle->out.disp_converter, handle->out.disp_sink, NULL);
+    CHECK(ret != FALSE, "Failed to link elements in output stage: screen sink", RET_ERR);
+
+    ret = gst_element_link_many(handle->out.tee, handle->out.dev_queue, 
+                                /*handle->out.dev_parser,*/ handle->out.dev_sink, NULL);
+    CHECK(ret != FALSE, "Failed to link elements in output stage: dev sink", RET_ERR);
+
     return RET_OK;
 }
 
