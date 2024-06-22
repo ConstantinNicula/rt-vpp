@@ -132,14 +132,21 @@ static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) 
 }
 
 static int create_processing_stage(PipelineHandle *handle) {
+    int num_shaders = 0;
     /* 1) Create gluploader */
     handle->proc.uploader = gst_element_factory_make("glupload", "proc-upload");
     CHECK(handle->proc.uploader != NULL, "Failed to allocate glupload element", RET_ERR);
 
     /* 2) Create glshader instances */
-    /* TODO: handle multiple shaders */ 
-    handle->proc.shader_stages[0] = create_shader("./shaders/invert_color.glsl", "invert_color");
-    handle->proc.shader_stages[1] = NULL;
+    /* TODO: fix hardcoding */ 
+    handle->proc.shader_stages[0] = create_shader("./shaders/horizontal_flip.glsl", "horizontal_flip");
+    // handle->proc.shader_stages[0] = create_shader("./shaders/vertical_flip.glsl", "vertical_flip");
+    // handle->proc.shader_stages[1] = create_shader("./shaders/invert_color.glsl", "invert_color");
+    // handle->proc.shader_stages[1] = create_shader("./shaders/crt_effect.glsl", "crt_effect");
+    // handle->proc.shader_stages[1] = create_shader("./shaders/ripple_effect.glsl", "ripple_effect");
+    handle->proc.shader_stages[1] = create_shader("./shaders/drunk_effect.glsl", "drunk_effect");
+    handle->proc.shader_stages[2] = create_shader("./shaders/crt_effect.glsl", "crt_effect");
+    num_shaders = 3;
 
     /* 3) Create gldownloader*/
     handle->proc.downloader = gst_element_factory_make("gldownload", "proc-download");
@@ -147,15 +154,18 @@ static int create_processing_stage(PipelineHandle *handle) {
 
     /* 4) Add all elements */
     gst_bin_add(GST_BIN(handle->pipeline), handle->proc.uploader);
-    for (int idx = 0; handle->proc.shader_stages[idx]; idx++) {
+    for (int idx = 0; idx < num_shaders; idx++) {
         gst_bin_add(GST_BIN(handle->pipeline), handle->proc.shader_stages[idx]);
     }
     gst_bin_add(GST_BIN(handle->pipeline), handle->proc.downloader);
     
     /* 5) Link all elements*/
-    /* TODO: fix linking of multiple */
     gst_element_link(handle->proc.uploader, handle->proc.shader_stages[0]);
-    gst_element_link(handle->proc.shader_stages[0], handle->proc.downloader);
+    for (int idx = 1; idx < num_shaders; idx++) {
+        DEBUG_PRINT_FMT("Linking shaders %d %d\n", idx-1, idx);
+        gst_element_link(handle->proc.shader_stages[idx-1], handle->proc.shader_stages[idx]);
+    }
+    gst_element_link(handle->proc.shader_stages[num_shaders-1], handle->proc.downloader);
 
     return RET_OK;
 }
@@ -169,7 +179,7 @@ static int create_encoding_stage(PipelineHandle *handle) {
     handle->enc.encoder = gst_element_factory_make("x264enc", "enc-h264");
     CHECK(handle->enc.encoder != NULL, "Failed to allocate x264enc element", RET_ERR);
     g_object_set(G_OBJECT(handle->enc.encoder), 
-                "bitrate", 500, 
+                "bitrate", 2000, 
                 "tune", 4, // zerolatency mode 
                 "speed-preset", 2, // superfast mode  
                 NULL);

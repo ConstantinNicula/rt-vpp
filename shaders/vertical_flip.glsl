@@ -9,6 +9,6 @@ uniform float width;
 uniform float height;
 
 void main () {
-    vec4 color = texture2D(tex, v_texcoord);
-    gl_FragColor = vec4(1.0 - color.rgb, color.a);
+    vec2 vflip_v_texcoord = vec2(v_texcoord.x, 1.0 - v_texcoord.y);
+    gl_FragColor = texture2D(tex, vflip_v_texcoord);
 }
