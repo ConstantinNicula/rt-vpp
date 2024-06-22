@@ -39,8 +39,8 @@ void read_camera_default_params(const char* dev_path, struct cam_params *out_par
     out_params->fr_denom = strprm.parm.capture.timeperframe.denominator;
     out_params->fr_num = strprm.parm.capture.timeperframe.numerator;
 
-    DEBUG_PRINT_FMT("Capture device with default params: width=%d, height=%d, framerate=%d/%d\n", 
-        out_params->width, out_params->height, out_params->fr_denom, out_params->fr_num);
+    DEBUG_PRINT_FMT("Capture device with default params: width=%d, height=%d, pixelformat=%d, framerate=%d/%d\n", 
+        out_params->width, out_params->height, out_params->pixelformat, out_params->fr_denom, out_params->fr_num);
 
     close(dev_fd);
 }

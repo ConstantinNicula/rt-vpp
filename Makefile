@@ -3,6 +3,8 @@ TARGET_NAME = video_streamer
 LIBS = -lm 
 CC = gcc 
 CFLAGS = -g -Wall 
+# Get compiler and linker flags for gstreamer
+DEPS = `pkg-config --cflags --libs gstreamer-1.0`
 
 # Makefile rules 
 TARGET = build/$(TARGET_NAME)
@@ -16,10 +18,10 @@ all: default
 default: build_loc $(TARGET)
 
 build/%.o: src/%.c 
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(DEPS) -c $< -o $@
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) $(CFLAGS) $(LIBS) -o $@
+	$(CC) $(OBJECTS) $(CFLAGS) $(LIBS) $(DEPS) -o $@  
 
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
