@@ -6,11 +6,11 @@
 #include <errno.h>
 
 #define ERROR(msg) do {\
-        fprintf(stderr, "[%s] ERROR: " msg "%s\n", __FUNCTION__, strerror(errno));\
+        fprintf(stderr, "[%s] ERROR: " msg "%s\n", __FUNCTION__, (errno != 0)? strerror(errno) : "");\
     } while(0)
 
 #define ERROR_FMT(fmt, args...) do {\
-        fprintf(stderr, "[%s] ERROR: " fmt "%s\n", __FUNCTION__, args, strerror(errno));\
+        fprintf(stderr, "[%s] ERROR: " fmt "%s\n", __FUNCTION__, args, (errno != 0) ? strerror(errno) : "");\
     } while(0)
 
 #define DEBUG_PRINT(msg) do {\
