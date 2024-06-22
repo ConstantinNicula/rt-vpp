@@ -1,83 +1,148 @@
 #include "pipeline.h"
 #include "cam_utils.h"
-#include "glib-object.h"
-#include "gst/gstelement.h"
-#include "gst/gstelementfactory.h"
-#include "gst/gstpipeline.h"
-#include "gst/gstutils.h"
-#include "gst/gstvalue.h"
 #include "log_utils.h"
+#include "shader_utils.h"
 
 static int create_decoding_stage(PipelineHandle *handle, CamParams *cam_params);
 static int create_processing_stage(PipelineHandle *handle);
 static int create_encoding_stage(PipelineHandle *handle);
 
-static GstElement* create_caps_filter(const char* type, const char* format, int width, int height, int fr_num, int fr_denom); 
+static GstElement* create_caps_filter(const char* type, const char* name, const char* format, 
+                                        int width, int height, int fr_num, int fr_denom);
+static GstElement* create_shader(const char* shader_path, const char* shader_name); 
 static void debug_print_caps(GstElement* elem, const char* pad);
 
 #define RET_OK   0
 #define RET_ERR -1 
 
 /* Yeah I know macros are evil but I got tired of typing the same thing over and over again...*/
-#define CHECK(expr, msg) do {\
-    if (!(expr)) {\
-        ERROR(msg);\
-        return RET_ERR;\
-    }\
+#define CHECK(expr, msg, ret) do {\
+    if (!(expr)) { ERROR(msg); return (ret); }\
 } while(0)
 
+
 int create_pipeline(CamParams *cam_params, PipelineHandle *handle) {
-    int ret = 0;
+    int create_res = 0;
+    gboolean link_res = FALSE;
+
     /* Create the empty pipeline */
     handle->pipeline = gst_pipeline_new("my-test-pipeline");
-    CHECK(handle->pipeline != NULL, "Failed to create pipeline \n");
+    CHECK(handle->pipeline != NULL, "Failed to create pipeline \n", RET_ERR);
 
     /* Create stages */    
-    ret = create_decoding_stage(handle, cam_params);
-    CHECK(ret == 0, "Failed to create decoding stage of pipeline\n"); 
+    create_res = create_decoding_stage(handle, cam_params);
+    CHECK(create_res == 0, "Failed to create decoding stage of pipeline\n", RET_ERR); 
 
-    ret = create_processing_stage(handle);
-    CHECK(ret == 0, "Failed to create processing stage of pipeline");
+    create_res = create_processing_stage(handle);
+    CHECK(create_res == 0, "Failed to create processing stage of pipeline", RET_ERR);
 
-    ret = create_encoding_stage(handle);
-    CHECK(ret == 0, "Failed to create encoding stage of pipeline\n");
+    create_res = create_encoding_stage(handle);
+    CHECK(create_res == 0, "Failed to create encoding stage of pipeline\n", RET_ERR);
+
+    /* Link stages */
+    link_res = gst_element_link(handle->dec.out_caps_filter, handle->proc.uploader);  
+    CHECK(link_res == TRUE, "Failed to link decode and processing stages of the pipeline\n", RET_ERR);
 
     return RET_OK;
 }
 
 static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) {
-    /* Create v4l2 source element */
+    /* 1) Create v4l2 source element */
     handle->dec.cam_source = gst_element_factory_make("v4l2src", "camera-source"); 
-    CHECK(handle->dec.cam_source != NULL, "Failed to allocate v4l2src element");
+    CHECK(handle->dec.cam_source != NULL, "Failed to allocate v4l2src element", RET_ERR);
     g_object_set(G_OBJECT(handle->dec.cam_source), 
                 "device", cam_params->dev_path, NULL);
-    DEBUG_PRINT_FMT("%s", cam_params->dev_path);
-
-    // TO DO: SELECT ON PIXEL TYPE 
-    /* Create capsfilter for source element */
-    handle->dec.cam_caps_filter = create_caps_filter("video/x-raw", NULL, 
-                    cam_params->width, cam_params->height, 
-                    cam_params->fr_num, cam_params->fr_denom);
-    CHECK(handle->dec.cam_caps_filter != NULL, "Failed to allocate camera caps filter\n");
     
-    /* Add front end elements to pipeline */ 
+    /* 2) Create capsfilter for source element & decoder */
+    DEBUG_PRINT_FMT("CHECKING THE FORMAT %s\n", pixel_format_to_str(cam_params->pixelformat));
+    switch (cam_params->pixelformat) {
+        case PIX_FMT_YUY2:
+            handle->dec.cam_caps_filter = create_caps_filter("video/x-raw", "camera-capsfilter", 
+                            pixel_format_to_str(cam_params->pixelformat), 
+                            cam_params->width, cam_params->height, 
+                            cam_params->fr_num, cam_params->fr_denom);
+            handle->dec.decoder = NULL;
+            break;
+        case PIX_FMT_MJPG:
+            handle->dec.cam_caps_filter = create_caps_filter("image/jpeg", "camera-capsfilter", 
+                            pixel_format_to_str(cam_params->pixelformat), 
+                            cam_params->width, cam_params->height, 
+                            cam_params->fr_num, cam_params->fr_denom);
+            handle->dec.decoder = gst_element_factory_make("avdec_mjpeg", "camera-decoder");
+            CHECK(handle->dec.decoder != NULL, "Failed to allocate camera decoder\n", RET_ERR);
+            break;
+        default:
+            ERROR("Failed to create caps filter! Unsupported pixel format\n");
+            return RET_ERR;
+    }
+    CHECK(handle->dec.cam_caps_filter != NULL, "Failed to allocate camera capsfilter\n", RET_ERR);
+
+    /* 3) Create video converter */
+    handle->dec.converter = gst_element_factory_make("videoconvert", "camera-convert");
+    CHECK(handle->dec.converter != NULL, "Failed to allocate camera converter\n", RET_ERR);
+
+    /* 4) Create output capsfilter */ 
+    handle->dec.out_caps_filter = create_caps_filter("video/x-raw", "output-capsfilter",
+                                "RGBA", 
+                                cam_params->width, cam_params->height,
+                                cam_params->fr_num, cam_params->fr_denom);
+    CHECK(handle->dec.out_caps_filter != NULL, "Failed to allocate output camera capsfilter\n", RET_ERR);
+    
+    /* 5) Add front end elements to pipeline */ 
     gst_bin_add_many(GST_BIN(handle->pipeline), 
-                    handle->dec.cam_source, 
-                    handle->dec.cam_caps_filter, 
-                    NULL);
-
-    debug_print_caps(handle->dec.cam_source, "src");
-    debug_print_caps(handle->dec.cam_caps_filter, "sink");
-
-    /* Link all elements */
-    gboolean res = gst_element_link(handle->dec.cam_source, handle->dec.cam_caps_filter );
+                     handle->dec.cam_source, 
+                     handle->dec.cam_caps_filter,
+                     handle->dec.converter, 
+                     handle->dec.out_caps_filter,
+                     handle->dec.decoder, /* Adding it last cause it might be NULL*/
+                     NULL);
+    
+    /* 6) Link all elements */
+    gboolean res = TRUE;
+    if (handle->dec.decoder) {
+        res = gst_element_link_many(handle->dec.cam_source,
+                              handle->dec.cam_caps_filter, 
+                              handle->dec.decoder, 
+                              handle->dec.converter, 
+                              handle->dec.out_caps_filter, NULL);
+    } else {
+        res = gst_element_link_many(handle->dec.cam_source,
+                              handle->dec.cam_caps_filter, 
+                              handle->dec.converter, 
+                              handle->dec.out_caps_filter, NULL);
+    }
     DEBUG_PRINT_EXPR(res);
-    CHECK(res == TRUE, "Failed to link elements\n");
+    CHECK(res == TRUE, "Failed to link elements\n", RET_ERR);
         
     return RET_OK;
 }
 
 static int create_processing_stage(PipelineHandle *handle) {
+    /* 1) Create gluploader */
+    handle->proc.uploader = gst_element_factory_make("glupload", "proc-upload");
+    CHECK(handle->proc.uploader != NULL, "Failed to allocate glupload element\n", RET_ERR);
+
+    /* 2) Create glshader instances */
+    /* TODO: handle multiple shaders */ 
+    handle->proc.shader_stages[0] = create_shader("./shaders/invert_color.glsl", "invert_color");
+    handle->proc.shader_stages[1] = NULL;
+
+    /* 3) Create gldownloader*/
+    handle->proc.downloader = gst_element_factory_make("gldownload", "proc-download");
+    CHECK(handle->proc.downloader != NULL, "Failed to allocate gldownlaod element\n", RET_ERR);
+
+    /* 4) Add all elements */
+    gst_bin_add(GST_BIN(handle->pipeline), handle->proc.uploader);
+    for (int idx = 0; handle->proc.shader_stages[idx]; idx++) {
+        gst_bin_add(GST_BIN(handle->pipeline), handle->proc.shader_stages[idx]);
+    }
+    gst_bin_add(GST_BIN(handle->pipeline), handle->proc.downloader);
+    
+    /* 5) Link all elements*/
+    /* TODO: fix linking of multiple */
+    gst_element_link(handle->proc.uploader, handle->proc.shader_stages[0]);
+    gst_element_link(handle->proc.shader_stages[0], handle->proc.downloader);
+
     return RET_OK;
 }
 
@@ -90,33 +155,42 @@ static void debug_print_caps(GstElement* elem, const char* pad) {
     DEBUG_PRINT_FMT("%s caps: %s\n", pad, gst_caps_to_string(caps));
 }
 
-static GstElement* create_caps_filter(const char* type, const char* format, int width, int height, int fr_num, int fr_denom) {
+static GstElement* create_caps_filter(const char* type, const char* name, const char* format, 
+                                        int width, int height, int fr_num, int fr_denom) {
     GstElement *caps_filter;
     GstCaps *caps;
 
-    caps_filter = gst_element_factory_make("capsfilter", "");
-    if (!caps_filter) {
-        ERROR("Failed to create capsfilter element\n");
-        return NULL;
-    }
+    /* Create caps filter element */
+    caps_filter = gst_element_factory_make("capsfilter", name);
+    CHECK(caps_filter != NULL, "Failed to create caps filter element\n", NULL);
+    
 
     /* Create a caps structure */
-    if (!format) {
-        caps = gst_caps_new_simple(type, 
-                                    "width", G_TYPE_INT, width, 
-                                    "height", G_TYPE_INT, height,
-                                    "framerate", GST_TYPE_FRACTION, fr_denom, fr_num,
-                                    NULL); 
-    } else {
-        caps = gst_caps_new_simple(type, 
-                                    "format", G_TYPE_STRING, format,
-                                    "width", G_TYPE_INT, width, 
-                                    "height", G_TYPE_INT, height,
-                                    "framerate", GST_TYPE_FRACTION, fr_denom, fr_num,
-                                    NULL); 
-    }
+    caps = gst_caps_new_simple(type,
+                                "format", G_TYPE_STRING, format,
+                                "width", G_TYPE_INT, width, 
+                                "height", G_TYPE_INT, height,
+                                "framerate", GST_TYPE_FRACTION, fr_denom, fr_num,
+                                NULL); 
+
     /* Set the caps attribute on the capsfilter element*/
     g_object_set(G_OBJECT(caps_filter), "caps", caps, NULL);
 
     return caps_filter;
+}
+
+static GstElement* create_shader(const char* shader_path, const char* shader_name) {
+    GstElement *shader;
+    char* shader_code = NULL;
+    
+    /* Load shader code. */
+    shader_code = load_shader(shader_path);
+    CHECK(shader_code != NULL, "Failed to load shader code!\n", NULL);
+
+    /* Crate shader object and set properties */
+    shader = gst_element_factory_make("glshader", shader_name); 
+    CHECK(shader != NULL, "Failed to create shader element \n", NULL);
+    g_object_set(G_OBJECT(shader), "fragment", shader_code, NULL);
+
+    return shader;
 }

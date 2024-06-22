@@ -1,9 +1,6 @@
 #include "cam_utils.h"
 #include "pipeline.h"
 
-#include "gst/gstclock.h"
-#include "gst/gstelement.h"
-#include "gst/gstmessage.h"
 #include "log_utils.h"
 #include <gst/gst.h>
 
@@ -23,7 +20,9 @@ int test_pipeline(int argc, char** argv) {
     read_cam_params(dev, &cam_params);
  
     /* Create the elements */
-    create_pipeline(&cam_params, &handle);
+    if (create_pipeline(&cam_params, &handle) == -1) {
+        return -1;
+    }
     GstElement* conv = gst_element_factory_make("videoconvert", "conv");
     GstElement* sink = gst_element_factory_make("autovideosink", "sink");
    
@@ -34,7 +33,7 @@ int test_pipeline(int argc, char** argv) {
 
     /* Build the pipeline */ 
     gst_bin_add_many(GST_BIN(handle.pipeline), conv, sink, NULL);
-    if (gst_element_link_many(handle.dec.cam_caps_filter, conv, sink, NULL) != TRUE) {
+    if (gst_element_link_many(handle.proc.downloader, conv, sink, NULL) != TRUE) {
         ERROR("Elements could not be linked");
         gst_object_unref(handle.pipeline);
         return -1;
