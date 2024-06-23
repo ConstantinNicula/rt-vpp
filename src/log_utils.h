@@ -5,6 +5,17 @@
 #include <string.h>
 #include <errno.h>
 
+/* Yeah I know macros are evil but I got tired of typing the same thing over and over again...*/
+
+typedef enum {
+   RET_OK  = 0, 
+   RET_ERR = -1
+} ErrorCode;
+
+#define CHECK(expr, msg, ret) do {\
+    if (!(expr)) { ERROR(msg); return (ret); }\
+} while(0)
+
 #define ERROR(msg) do {\
         fprintf(stderr, "[%s] ERROR: " msg "%s\n", __FUNCTION__, (errno != 0)? strerror(errno) : "");\
     } while(0)
