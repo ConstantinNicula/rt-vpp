@@ -2,6 +2,7 @@
 #include "pipeline.h"
 
 #include "log_utils.h"
+#include "shader_utils.h"
 #include <gst/gst.h>
 
 int test_pipeline(int argc, char** argv) {
@@ -12,9 +13,13 @@ int test_pipeline(int argc, char** argv) {
     PipelineHandle handle;
     CamParams cam_params  = {0};
 
-    /* Initialize GStreamer */
+     /* Initialize GStreamer */
     gst_init(&argc, &argv);
-
+   
+    init_shader_store();
+    if (add_shaders_to_store("./shaders") == RET_OK) 
+        DEBUG_PRINT("Loaded all shaders\n");
+    
     /* Read camera parameters */
     const char* dev = "/dev/video0";
     read_cam_params(dev, &cam_params);
@@ -64,7 +69,8 @@ int test_pipeline(int argc, char** argv) {
     gst_object_unref(bus);
     gst_element_set_state(handle.pipeline, GST_STATE_NULL);
     gst_object_unref(handle.pipeline);
-    return 0;
+    cleanup_shader_store();
+    return RET_OK;
 }  
 
 int main(int argc, char** argv) {

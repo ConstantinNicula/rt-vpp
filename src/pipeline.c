@@ -1,9 +1,8 @@
 #include "pipeline.h"
-#include "cam_utils.h"
 #include "glib-object.h"
-#include "gst/gstelementfactory.h"
-#include "gst/gstutils.h"
+#include "gst/gstelement.h"
 #include "log_utils.h"
+#include "cam_utils.h"
 #include "shader_utils.h"
 
 static int create_decoding_stage(PipelineHandle *handle, CamParams *cam_params);
@@ -14,16 +13,9 @@ static int create_output_stage(PipelineHandle *handle);
 
 static GstElement* create_caps_filter(const char* type, const char* name, const char* format, 
                                         int width, int height, int fr_num, int fr_denom);
-static GstElement* create_shader(const char* shader_path, const char* shader_name); 
+static int create_shader_pipeline_from_string(PipelineHandle *handle, char* shader_pipeline);
+static GstElement* create_shader(const char* shader_name); 
 static void debug_print_caps(GstElement* elem, const char* pad);
-
-#define RET_OK   0
-#define RET_ERR -1 
-
-/* Yeah I know macros are evil but I got tired of typing the same thing over and over again...*/
-#define CHECK(expr, msg, ret) do {\
-    if (!(expr)) { ERROR(msg); return (ret); }\
-} while(0)
 
 
 int create_pipeline(CamParams *cam_params, PipelineHandle *handle) {
@@ -138,15 +130,11 @@ static int create_processing_stage(PipelineHandle *handle) {
     CHECK(handle->proc.uploader != NULL, "Failed to allocate glupload element", RET_ERR);
 
     /* 2) Create glshader instances */
-    /* TODO: fix hardcoding */ 
-    handle->proc.shader_stages[0] = create_shader("./shaders/horizontal_flip.glsl", "horizontal_flip");
-    // handle->proc.shader_stages[0] = create_shader("./shaders/vertical_flip.glsl", "vertical_flip");
-    // handle->proc.shader_stages[1] = create_shader("./shaders/invert_color.glsl", "invert_color");
-    // handle->proc.shader_stages[1] = create_shader("./shaders/crt_effect.glsl", "crt_effect");
-    // handle->proc.shader_stages[1] = create_shader("./shaders/ripple_effect.glsl", "ripple_effect");
-    handle->proc.shader_stages[1] = create_shader("./shaders/drunk_effect.glsl", "drunk_effect");
-    handle->proc.shader_stages[2] = create_shader("./shaders/crt_effect.glsl", "crt_effect");
-    num_shaders = 3;
+
+    /* TODO: fix hardcoding */
+    char *shader_pipeline = strdup("crt_effect ! invert_color");
+    num_shaders = create_shader_pipeline_from_string(handle, shader_pipeline);
+    CHECK(num_shaders != RET_ERR, "Failed to create entire shader pipeline", RET_ERR);
 
     /* 3) Create gldownloader*/
     handle->proc.downloader = gst_element_factory_make("gldownload", "proc-download");
@@ -220,7 +208,8 @@ static int create_output_stage(PipelineHandle *handle) {
     // TO DO: Fix hardcoding
     handle->out.dev_sink = gst_element_factory_make("v4l2sink", "disp-devsink");
     CHECK(handle->out.dev_sink != NULL, "Failed to allocate v4l2sink element", RET_ERR);
-    g_object_set(G_OBJECT(handle->out.dev_sink), "device", "/dev/video2", NULL);
+    g_object_set(G_OBJECT(handle->out.dev_sink), "device", "/dev/video2",
+                                                "sync", FALSE,  NULL);
     
     /* Display path */
     /* 2.b1) Create display decoder */
@@ -238,7 +227,8 @@ static int create_output_stage(PipelineHandle *handle) {
     /* 2.b4) Create display sink */
     handle->out.disp_sink = gst_element_factory_make("autovideosink", "disp-autovideosink");
     CHECK(handle->out.disp_sink != NULL, "Failed to allocate autovideosink element", RET_ERR);
-
+    g_object_set(G_OBJECT(handle->out.disp_sink), "sync", FALSE, NULL);
+    
     /* 3) Add elements */
     gst_bin_add_many(GST_BIN(handle->pipeline), handle->out.tee, 
                     handle->out.dev_queue, handle->out.dev_sink, NULL);
@@ -281,21 +271,41 @@ static GstElement* create_caps_filter(const char* type, const char* name, const 
     return caps_filter;
 }
 
-static GstElement* create_shader(const char* shader_path, const char* shader_name) {
+static int create_shader_pipeline_from_string(PipelineHandle *handle, char* shader_pipeline) {
+    const char* DELIMITERS = "! "; // TODO: Fix will allow accept "shader1 shader2"
+    int num_stages = 0;
+
+    char* shader_name_ptr = strtok(shader_pipeline, DELIMITERS);   
+    while (shader_name_ptr != NULL) {
+        /* Create shader stage*/
+        handle->proc.shader_stages[num_stages++] = create_shader(shader_name_ptr);    
+        CHECK(handle->proc.shader_stages != NULL, "Failed to create shader stage \n", RET_ERR);
+
+        /* Advance to next shader stage*/ 
+        shader_name_ptr = strtok(NULL, DELIMITERS);
+    }
+    return num_stages;
+}
+
+static GstElement* create_shader(const char* shader_name) {
     GstElement *shader;
-    char* shader_code = NULL;
     
     /* Load shader code. */
-    shader_code = load_shader(shader_path);
-    CHECK(shader_code != NULL, "Failed to load shader code!", NULL);
+    const char* shader_code = get_shader_code(shader_name);
+    if (!shader_code) {
+        ERROR_FMT("Failed to load shader code for shader [%s]", shader_name);
+        return NULL;
+    }
 
     /* Crate shader object and set properties */
-    shader = gst_element_factory_make("glshader", shader_name); 
+    shader = gst_element_factory_make("glshader", NULL); 
     CHECK(shader != NULL, "Failed to create shader element", NULL);
     g_object_set(G_OBJECT(shader), "fragment", shader_code, NULL);
 
+    DEBUG_PRINT_FMT("[%s] - [%s] created! \n", shader_name, GST_ELEMENT_NAME(shader));
     return shader;
 }
+
 
 static void debug_print_caps(GstElement* elem, const char* pad) {
     GstCaps *caps = gst_pad_query_caps(gst_element_get_static_pad(elem, pad), NULL);
