@@ -12,27 +12,27 @@ typedef struct HashMapEntry {
 
 typedef struct HashMap {
     HashMapEntry_t** buckets;
-    uint32_t numBuckets;
+    uint32_t num_buckets;
     uint32_t itemCnt;
 } HashMap_t;
 
 typedef struct HashMapIter {
-    uint32_t curBucket; 
-    HashMapEntry_t* curElem; 
+    uint32_t cur_bucket; 
+    HashMapEntry_t* cur_elem; 
 } HashMapIter_t;
 
 typedef void (*HashMapElemCleanupFn_t) (void** elem);
 typedef void* (*HashMapElemCopyFn_t) (const void* elem);
 
-HashMap_t* createHashMap();
-HashMap_t* copyHashMap(const HashMap_t* map, HashMapElemCopyFn_t copyFn);
-void cleanupHashMapElements(HashMap_t* map, HashMapElemCleanupFn_t cleanupFn);
-void cleanupHashMap(HashMap_t** map, HashMapElemCleanupFn_t cleanupFn);
+HashMap_t* create_hash_map();
+HashMap_t* copy_hash_map(const HashMap_t* map, HashMapElemCopyFn_t copyFn);
+void cleanup_hash_map_elements(HashMap_t* map, HashMapElemCleanupFn_t cleanupFn);
+void cleanup_hash_map(HashMap_t** map, HashMapElemCleanupFn_t cleanupFn);
 
-HashMapIter_t createHashMapIter(const HashMap_t* map);
-HashMapEntry_t* hashMapIterGetNext(const HashMap_t* map, HashMapIter_t* iter);
+HashMapIter_t create_hash_map_iter(const HashMap_t* map);
+HashMapEntry_t* hash_map_iter_get_next(const HashMap_t* map, HashMapIter_t* iter);
 
-void* hashMapInsert(HashMap_t* map, const char* key , void* value);
-void* hashMapGet(HashMap_t* map, const char* key);
+void* hash_map_insert(HashMap_t* map, const char* key , void* value);
+void* hash_map_get(HashMap_t* map, const char* key);
 
 #endif 
