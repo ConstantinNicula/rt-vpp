@@ -152,7 +152,7 @@ static void hash_map_resize(HashMap_t* map)  {
     HashMapEntry_t** prevBuckets = map->buckets;
 
     uint32_t new_num_buckets = map->num_buckets * 2;
-    HashMapEntry_t** new_buckets = calloc(map->num_buckets, sizeof(HashMapEntry_t*));
+    HashMapEntry_t** new_buckets = calloc(new_num_buckets, sizeof(HashMapEntry_t*));
     if (!new_buckets) {
         ERROR("Calloc failed \n");
         return; /* Do not perform resize*/
