@@ -388,7 +388,7 @@ static int create_shader_pipeline_from_string(PipelineHandle *handle, const char
 }
 
 const char *shader_string_vertex_default =
-    "#version 100\n"
+    DEFAULT_SHADER_VERSION
     "attribute vec4 a_position;\n"
     "attribute vec2 a_texcoord;\n"
     "varying vec2 v_texcoord;\n"
@@ -407,6 +407,7 @@ static GstElement* create_shader(const char* shader_name) {
         ERROR_FMT("Failed to load shader code for shader [%s]", shader_name);
         return NULL;
     }
+    // DEBUG_PRINT_FMT("Shader code; %s \n", shader_code);
 
     /* Crate shader object and set properties */
     shader = gst_element_factory_make("glshader", NULL); 
