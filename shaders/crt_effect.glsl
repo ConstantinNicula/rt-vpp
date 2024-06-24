@@ -1,5 +1,4 @@
 /* Adapted from: https://www.shadertoy.com/view/WsVSzV */
-
 #ifdef GL_ES
 precision mediump float;
 #endif

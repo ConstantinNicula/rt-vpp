@@ -378,6 +378,17 @@ static int create_shader_pipeline_from_string(PipelineHandle *handle, const char
     return num_stages;
 }
 
+const char *shader_string_vertex_default =
+    "#version 100\n"
+    "attribute vec4 a_position;\n"
+    "attribute vec2 a_texcoord;\n"
+    "varying vec2 v_texcoord;\n"
+    "void main()\n"
+    "{\n"
+    "   gl_Position = a_position;\n"
+    "   v_texcoord = a_texcoord;\n"
+    "}\n";
+
 static GstElement* create_shader(const char* shader_name) {
     GstElement *shader;
     
@@ -391,7 +402,8 @@ static GstElement* create_shader(const char* shader_name) {
     /* Crate shader object and set properties */
     shader = gst_element_factory_make("glshader", NULL); 
     CHECK(shader != NULL, "Failed to create shader element", NULL);
-    g_object_set(G_OBJECT(shader), "fragment", shader_code, NULL);
+    g_object_set(G_OBJECT(shader), "fragment", shader_code,
+                                    "vertex", shader_string_vertex_default, NULL);
 
     DEBUG_PRINT_FMT("[%s]-[%s] created! \n", shader_name, GST_ELEMENT_NAME(shader));
     return shader;
