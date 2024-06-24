@@ -19,7 +19,7 @@ float character(int n, vec2 p)
 			if (((n >> a) & 1) == 1) return 1.0;
 		}	
     }
-	return 0.2;
+	return 0.3;
 }
 
 void main()
