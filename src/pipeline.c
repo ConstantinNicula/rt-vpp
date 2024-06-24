@@ -365,13 +365,24 @@ static GstElement* create_caps_filter(const char* type, const char* name, const 
     return caps_filter;
 }
 
+static void _remove_char(char* s, char c) {
+    int j, n = strlen(s);
+    for(int i = j = 0; i < n; i++) {
+        if (s[i] != c) 
+            s[j++] = s[i];
+    }
+    s[j] = '\0';
+}
+
 static int create_shader_pipeline_from_string(PipelineHandle *handle, const char* shader_pipeline) {
     const char* DELIMITERS = "! "; // TODO: Fix will allow accept "shader1 shader2"
     int num_stages = 0;
-
+    DEBUG_PRINT_FMT("!!!!%s\n", shader_pipeline);
     char* copy_shader_pipeline = strdup(shader_pipeline);
     char* shader_name_ptr = strtok(copy_shader_pipeline, DELIMITERS);   
     while (shader_name_ptr != NULL) {
+        /*Remove ' " ' characters "*/
+        _remove_char(shader_name_ptr, '"');
         /* Create shader stage*/
         handle->proc.shader_stages[num_stages++] = create_shader(shader_name_ptr);    
         if (handle->proc.shader_stages[num_stages-1] == NULL) {
