@@ -1,4 +1,5 @@
 #include "cam_utils.h"
+#include "gst/gstdebugutils.h"
 #include "pipeline.h"
 
 #include "log_utils.h"
@@ -10,7 +11,8 @@ int test_pipeline(int argc, char** argv) {
     GstMessage *msg;
     GstStateChangeReturn ret;
 
-    PipelineHandle handle;
+    PipelineHandle handle = {0};
+    PipelineConfig pipeline_config = {0};
     CamParams cam_params  = {0};
 
      /* Initialize GStreamer */
@@ -22,12 +24,15 @@ int test_pipeline(int argc, char** argv) {
     
     /* Read camera parameters */
     const char* dev = "/dev/video0";
-    read_cam_params(dev, &cam_params);
+    if (read_cam_params(dev, &cam_params) != RET_OK) return RET_ERR;
  
     /* Create the elements */
-    if (create_pipeline(&cam_params, &handle) == -1) {
-        return -1;
-    }
+    get_default_pipeline_config(&pipeline_config);
+    pipeline_config.shader_pipeline = "horizontal_flip ! ripple_effect ! invert_color";
+    pipeline_config.out_height = 900;
+    pipeline_config.out_width = 900;
+    pipeline_config.dev_sink = "/dev/video2";
+    if (create_pipeline(&cam_params, &pipeline_config, &handle) != RET_OK) return RET_ERR; 
    
     /* Start playing */
     ret = gst_element_set_state(handle.pipeline, GST_STATE_PLAYING);
@@ -36,7 +41,7 @@ int test_pipeline(int argc, char** argv) {
         gst_object_unref(handle.pipeline);
         return -1;
     }
-
+    gst_debug_bin_to_dot_file(GST_BIN(handle.pipeline), GST_DEBUG_GRAPH_SHOW_CAPS_DETAILS, "testfile.dot");
     /* Wait until error or EOS */
     bus = gst_element_get_bus(handle.pipeline);
     msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_ERROR| GST_MESSAGE_EOS);

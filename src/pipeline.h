@@ -32,7 +32,9 @@ typedef struct _PipelineHandle {
         GstElement* shader_stages[MAX_NUM_SHADER_STAGES + 1];
         /* Copy buffer GPU to host */
         GstElement* downloader;
-        /* TO DO ADD SCALER*/
+        /* Video scaler */
+        GstElement* scaler;
+        GstElement* out_caps_filter;
     } proc;
 
     /* Encoding stage elements */
@@ -63,6 +65,23 @@ typedef struct _PipelineHandle {
     } out;
 } PipelineHandle;
 
-int create_pipeline(CamParams *cam_params, PipelineHandle *handle);
+
+typedef struct _PipelineConfig {
+    /* Chain of shader stages */
+    char* shader_pipeline;
+
+    /* Output dimensions after rescaling */
+    int out_width;
+    int out_height;
+
+    /* Encoder settings */
+    int bitrate;
+
+    /* Sink settings (NULL if not requested) */
+    char* dev_sink; 
+} PipelineConfig;
+
+void get_default_pipeline_config(PipelineConfig *out_pipeline_config);
+int create_pipeline(CamParams *cam_params, PipelineConfig *pipeline_config, PipelineHandle *out_handle);
 
 #endif

@@ -23,8 +23,9 @@ case $PIXEL_FORMAT in
     echo "Using YUYV pipeline...." 
     # Camera input format is raw YUYV
     gst-launch-1.0 v4l2src device=/dev/video0 ! video/x-raw,width=$WIDTH,height=$HEIGHT!\
-        videoconvert ! capsfilter caps="video/x-raw, format=RGBA" ! \
-        glupload ! glshader fragment="\"`cat ${SHADER_PATH}`\"" ! gldownload! \
+        videoconvert ! videoconvert ! capsfilter caps="video/x-raw,width=$WIDTH,height=$HEIGHT,format=RGBA" ! \
+        glupload ! glshader fragment="\"`cat ${SHADER_PATH}`\"" ! gldownload ! \
+        videoscale add-borders=0 ! capsfilter caps="video/x-raw, format=RGBA,width=800, height=100, pixel-aspect-ratio=1/1" ! \
         videoconvert ! x264enc bitrate=500 tune="zerolatency" speed-preset="superfast" ! h264parse ! avdec_h264  ! \
         videoconvert ! autovideosink
     ;;
@@ -35,6 +36,7 @@ case $PIXEL_FORMAT in
     gst-launch-1.0 v4l2src device=/dev/video0 ! image/jpeg,width=$WIDTH,height=$HEIGHT ! \
         avdec_mjpeg ! videoconvert ! capsfilter caps="video/x-raw,width=$WIDTH,height=$HEIGHT,format=RGBA" ! \
         glupload ! glshader fragment="\"`cat ${SHADER_PATH}`\"" ! gldownload! \
+        videoscale add-borders=0 ! capsfilter caps="video/x-raw, format=RGBA,width=800, height=100, pixel-aspect-ratio=1/1" ! \
         videoconvert ! x264enc bitrate=500 tune="zerolatency" speed-preset="superfast" ! h264parse ! avdec_h264 ! \
         videoconvert ! autovideosink
     ;;
