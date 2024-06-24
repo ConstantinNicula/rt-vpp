@@ -4,7 +4,7 @@ DEVICE=/dev/video0
 
 # Make exec location invariant 
 PARENT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")"; pwd -P ) 
-SHADER_PATH=$PARENT_PATH/../shaders/invert_color.glsl 
+SHADER_PATH=$PARENT_PATH/invert_color.glsl 
 
 # Extract current resolution and framerate using v4l2-ctl 
 CAPTURE_FORMAT=$(v4l2-ctl -d $DEVICE -V)
@@ -27,7 +27,7 @@ case $PIXEL_FORMAT in
         glupload ! glshader fragment="\"`cat ${SHADER_PATH}`\"" ! gldownload ! \
         videoscale add-borders=0 ! capsfilter caps="video/x-raw, format=RGBA,width=800, height=100, pixel-aspect-ratio=1/1" ! \
         videoconvert ! x264enc bitrate=500 tune="zerolatency" speed-preset="superfast" ! h264parse ! avdec_h264  ! \
-        videoconvert ! autovideosink
+        videoconvert ! autovideosink name=test
     ;;
 
     *MJPG ) 
