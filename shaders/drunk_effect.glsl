@@ -1,5 +1,5 @@
 /* Adapted from: https://www.shadertoy.com/view/MdSGRh */
-
+#version 100
 #ifdef GL_ES
 precision mediump float;
 #endif
