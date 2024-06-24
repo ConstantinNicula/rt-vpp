@@ -15,9 +15,9 @@ The full processing pipeline contains four stages:
 
 ## Demo
 
-A single v4l2 capture device was duplicated five times using v4l2loopback devices. For each of the five feeds a separate (independent) rt-vpp instance was used to process the video stream. Different configurations were used to showcase the shader effects in action.
+A single v4l2 capture device was duplicated five times using v4l2loopback devices. For each of the five feeds a separate (independent) rt-vpp instance was used to process the video stream. Different configurations were used to showcase the shader effects in action. Refer to the `start_demo.sh` script for more info.
 
-Note: The non-trivial shader effects are slightly modified versions of existing shadertoy shaders. Modifications are limited to adjustments for uniform & varying shader attributes which ar not directly compatible. I've added a link in the shader source files to the original shadertoy page.
+Note: The non-trivial shader effects are slightly modified versions of existing shadertoy shaders. Modifications are limited to adjustments for uniform & varying shader attributes which are not directly compatible. I've added a link in the shader source files to the original shadertoy page.
 
 ## Usage
 
@@ -54,11 +54,11 @@ Application Options:
                                                 Example: --shader-src-path=../shaders
 ```
 
-Note: All defined transformation have an associated shader which can be found in `<clone-repo-path>/shaders`. All the shaders found in this folder are loaded at startup and can be used in user defined pipelines. There is a direct mapping between the shader code file name and the transformation name. For example the shader code for transformation invert_color can be found in `shaders/invert_color.glsl`.  
+Note: All defined transformation have an associated shader which can be found in `<clone-repo-path>/shaders`. All the shaders found in this folder are loaded at startup and can be used in user defined pipelines. There is a direct mapping between the shader code file name and the transformation name. For example the shader code for transformation `invert_color` can be found in `shaders/invert_color.glsl`.  
 
 ### Typical use-cases
 
-1) Read from capture device `/dev/video0`, invert the colors, apply a vertical flip, scale 800x600: 
+1) Read from capture device `/dev/video0`, invert the colors, apply a vertical flip, scale 800x600:
 
     ```bash
     ./build/rt-vpp -i /dev/video0 -p "invert_color ! horizontal_flip" -w 800 -h 600
@@ -74,26 +74,26 @@ Note: All defined transformation have an associated shader which can be found in
 
 ## Dependencies
 
-(Mandatory) Gstreamer is the backbone of the processing pipeline so it must be installed, on Ubuntu/Debian you can run the following command (Note: this is a full installation, not all plugins are necessary but I was to lazy manually check what the minimal config is):
+[Mandatory] Gstreamer is the backbone of the processing pipeline so it must be installed, on Ubuntu/Debian you can run the following command (Note: this is a full installation, not all plugins are necessary but I was to lazy manually check what the minimal config is):
 
 ```bash
 sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
 ```
 
-(Recommended) OpenGL shaders are exclusively used for all frame processing steps. An easy way to check that your platform supports OpenGL is via glxgears util:
+[Recommended] OpenGL shaders are exclusively used for all frame processing steps. An easy way to check that your platform supports OpenGL is via glxgears util:
 
 ```bash
 sudo apt-get install mesa-utils
 glxgears 
 ```
 
-(Recommended) This guide uses v4l2-ctl in order to identify/set capture devices properties:
+[Recommended] This guide uses v4l2-ctl in order to identify/set capture devices properties:
 
 ```bash
 sudo apt install v4l-utils
 ```
 
-(Optional) if you intend to use v4l2sink functionally to create an output virtual camera you will need to install a few extra things:
+[Optional] if you intend to use v4l2sink functionally to create an output virtual camera you will need to install a few extra things:
 
 ```bash
 sudo apt install v4l2loopback-dkms
