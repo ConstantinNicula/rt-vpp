@@ -2,16 +2,29 @@
 
 ## 0. Install dependencies
 
-Gstreamer is the backbone of the processing pipeline so it must be installed, on Ubuntu/Debian you can run the following command:
+(Mandatory) Gstreamer is the backbone of the processing pipeline so it must be installed, on Ubuntu/Debian you can run the following command (Note: this is a full installation, not all plugins are necessary but I was to lazy manually check what the minimal config is):
 
 ```bash
 sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
 ```
 
-Some other optional (nice to have utilities):
+(Recommended) OpenGL shaders are exclusively used for all frame processing steps. An easy way to check that your platform supports OpenGL is via glxgears util:
+
+```bash
+sudo apt-get install mesa-utils
+glxgears 
+```
+
+(Recommended) This guide uses v4l2-ctl in order to identify/set capture devices properties:
 
 ```bash
 sudo apt install v4l-utils
+```
+
+(Optional) if you intend to use v4l2sink functionally to create an output virtual camera you will need to install a few extra things:
+
+```bash
+sudo apt install v4l2loopback-dkms
 ```
 
 ## 1. Finding a V4L2 device node
