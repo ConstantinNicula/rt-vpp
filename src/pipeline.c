@@ -21,7 +21,9 @@ static void debug_print_caps(GstElement* elem, const char* pad);
 
 void get_default_pipeline_config(PipelineConfig *out_pipeline_config) {
     *out_pipeline_config = (PipelineConfig){
-        .shader_pipeline = "passthrough",
+        .dev_src = "/dev/video0",
+        .shader_pipeline = "vertical_flip ! invert_color",
+        .shader_src_folder = "./shaders",
         .bitrate = 2000, 
         .out_height = -1, 
         .out_width = -1, 
@@ -59,6 +61,58 @@ int create_pipeline(CamParams *cam_params, PipelineConfig *pipeline_config, Pipe
 
     link_res = gst_element_link(handle->enc.out_caps_filter, handle->out.tee);
     CHECK(link_res == TRUE, "Failed to link encoding and output stages of the pipeline", RET_ERR);
+
+    return RET_OK;
+}
+
+int play_pipeline(PipelineHandle *handle) {
+    GstBus *bus = NULL;
+    GstMessage *msg = NULL;
+    GstStateChangeReturn ret;
+
+    /* Start playing */
+    ret = gst_element_set_state(handle->pipeline, GST_STATE_PLAYING);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        ERROR("Unable to set the pipeline to the playing state.\n");
+        gst_object_unref(handle->pipeline);
+        return RET_ERR;
+    }
+
+    /* DEBUG: output dot file describing pipeline */
+    gst_debug_bin_to_dot_file(GST_BIN(handle->pipeline), GST_DEBUG_GRAPH_SHOW_CAPS_DETAILS, "debug_pipeline_nodes.dot");
+
+    /* Wait until error or EOS */
+    bus = gst_element_get_bus(handle->pipeline);
+    msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_ERROR| GST_MESSAGE_EOS);
+
+    /* Parse message */ 
+    if (msg != NULL) {
+        GError *err;
+        gchar *debug_info;
+
+        switch (GST_MESSAGE_TYPE(msg)) {
+            case GST_MESSAGE_ERROR: 
+                gst_message_parse_error(msg, &err, &debug_info);
+                ERROR_FMT("Error received from element %s: %s\n", GST_OBJECT_NAME(msg->src), err->message);
+                ERROR_FMT("Debugging information: %s\n", debug_info ? debug_info: "none");
+                g_clear_error(&err);
+                g_free(debug_info);
+                break;
+            case GST_MESSAGE_EOS: 
+                DEBUG_PRINT("End-Of-Stream reached.\n");
+                break;
+            default: 
+                /* We should no reach this point because we only asked for ERRORs and EOS */
+                DEBUG_PRINT("Unexpected message received. \n");
+                break;
+        }
+        gst_message_unref(msg);
+    }
+
+    /* Free resources */
+    gst_object_unref(bus);
+    gst_element_set_state(handle->pipeline, GST_STATE_NULL);
+    gst_object_unref(handle->pipeline);
 
     return RET_OK;
 }
@@ -131,7 +185,6 @@ static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) 
                               handle->dec.converter, 
                               handle->dec.out_caps_filter, NULL);
     }
-    DEBUG_PRINT_EXPR(res);
     CHECK(res == TRUE, "Failed to link elements", RET_ERR);
         
     return RET_OK;
@@ -233,8 +286,7 @@ static int create_output_stage(PipelineHandle *handle, PipelineConfig *pipeline_
         /* 2.a2) Create V4L2 sink */
         handle->out.dev_sink = gst_element_factory_make("v4l2sink", "disp-devsink");
         CHECK(handle->out.dev_sink != NULL, "Failed to allocate v4l2sink element", RET_ERR);
-        g_object_set(G_OBJECT(handle->out.dev_sink), "device", pipeline_config->dev_sink,
-                                                    "sync", FALSE,  NULL);
+        g_object_set(G_OBJECT(handle->out.dev_sink), "device", pipeline_config->dev_sink, NULL);
     }
    
     /* Display path */
@@ -300,7 +352,7 @@ static GstElement* create_caps_filter(const char* type, const char* name, const 
 
     /* Set the caps attribute on the capsfilter element*/
     g_object_set(G_OBJECT(caps_filter), "caps", caps, NULL);
-
+    // gst_caps_unref(caps);
     return caps_filter;
 }
 

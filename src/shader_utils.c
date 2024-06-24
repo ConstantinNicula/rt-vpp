@@ -27,7 +27,7 @@ int init_shader_store() {
 int add_shaders_to_store(const char* shader_folder_path) {
     DIR *dir = NULL;
     struct dirent *dir_entry = NULL;
-
+    int count_loaded = 0;
     dir = opendir(shader_folder_path);
     if (!dir) {
         ERROR_FMT("Failed to open shader folder %s\n", shader_folder_path);
@@ -44,9 +44,10 @@ int add_shaders_to_store(const char* shader_folder_path) {
 
             /* Load shader code and add to store. */
             char *shader_code = load_shader_code(full_path); 
-            if (shader_code) 
+            if (shader_code) { 
                 hash_map_insert(shader_store, shader_name, shader_code);
-            
+                count_loaded++;
+            } 
             /* Free malloc'd data, hashmap dups keys by default*/
             free(shader_name);
             free(full_path);
@@ -55,6 +56,13 @@ int add_shaders_to_store(const char* shader_folder_path) {
     }
 
     closedir(dir);
+
+    /* Log something when we failed to load any shaders...*/
+    if (count_loaded == 0) {
+        ERROR_FMT("Failed to find any .glsl shaders in folder: %s\n", shader_folder_path);
+        return RET_ERR;
+    }
+
     return RET_OK;
 }
 

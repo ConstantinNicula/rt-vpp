@@ -67,8 +67,12 @@ typedef struct _PipelineHandle {
 
 
 typedef struct _PipelineConfig {
+    /* Source settings */
+    char* dev_src;
+
     /* Chain of shader stages */
-    char* shader_pipeline;
+    char *shader_pipeline;
+    char *shader_src_folder;
 
     /* Output dimensions after rescaling */
     int out_width;
@@ -78,10 +82,11 @@ typedef struct _PipelineConfig {
     int bitrate;
 
     /* Sink settings (NULL if not requested) */
-    char* dev_sink; 
+    char *dev_sink; 
 } PipelineConfig;
 
 void get_default_pipeline_config(PipelineConfig *out_pipeline_config);
 int create_pipeline(CamParams *cam_params, PipelineConfig *pipeline_config, PipelineHandle *out_handle);
+int play_pipeline(PipelineHandle* handle);
 
 #endif

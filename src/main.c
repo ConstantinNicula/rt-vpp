@@ -1,4 +1,5 @@
 #include "cam_utils.h"
+#include "glib.h"
 #include "gst/gstdebugutils.h"
 #include "pipeline.h"
 
@@ -6,79 +7,92 @@
 #include "shader_utils.h"
 #include <gst/gst.h>
 
-int test_pipeline(int argc, char** argv) {
-    GstBus *bus;
-    GstMessage *msg;
-    GstStateChangeReturn ret;
+static int read_cmd_line_params(int argc, char *argv[], PipelineConfig* out_config); 
 
+int main(int argc, char *argv[]) {
     PipelineHandle handle = {0};
     PipelineConfig pipeline_config = {0};
     CamParams cam_params  = {0};
 
-     /* Initialize GStreamer */
-    gst_init(&argc, &argv);
-   
+    /* Parse command line args */
+    if (read_cmd_line_params(argc, argv, &pipeline_config) != RET_OK) return RET_ERR;
+
+    /* Initialize shader stuff */
     init_shader_store();
-    if (add_shaders_to_store("./shaders") == RET_OK) 
-        DEBUG_PRINT("Loaded all shaders\n");
-    
+    DEBUG_PRINT_FMT("Loading shaders from %s\n", pipeline_config.shader_src_folder);
+    if (add_shaders_to_store(pipeline_config.shader_src_folder) != RET_OK) goto err; 
+  
     /* Read camera parameters */
-    const char* dev = "/dev/video0";
-    if (read_cam_params(dev, &cam_params) != RET_OK) return RET_ERR;
- 
+    DEBUG_PRINT_FMT("Reading camera parameters for device %s\n", pipeline_config.dev_src);
+    if (read_cam_params(pipeline_config.dev_src, &cam_params) != RET_OK) goto err;
+    
     /* Create the elements */
-    get_default_pipeline_config(&pipeline_config);
-    pipeline_config.shader_pipeline = "horizontal_flip ! ripple_effect ! invert_color ! drunk_effect ! crt_effect";
-    pipeline_config.out_height = 900;
-    pipeline_config.out_width = 900;
-    pipeline_config.dev_sink = "/dev/video2";
-    if (create_pipeline(&cam_params, &pipeline_config, &handle) != RET_OK) return RET_ERR; 
+    if (create_pipeline(&cam_params, &pipeline_config, &handle) != RET_OK) goto err; 
 
+    /* Play pipeline */
+    if (play_pipeline(&handle) != RET_OK) goto err;
 
-    /* Start playing */
-    ret = gst_element_set_state(handle.pipeline, GST_STATE_PLAYING);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        ERROR("Unable to set the pipeline to the playing state.\n");
-        gst_object_unref(handle.pipeline);
-        return -1;
-    }
-    gst_debug_bin_to_dot_file(GST_BIN(handle.pipeline), GST_DEBUG_GRAPH_SHOW_CAPS_DETAILS, "testfile.dot");
-    /* Wait until error or EOS */
-    bus = gst_element_get_bus(handle.pipeline);
-    msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_ERROR| GST_MESSAGE_EOS);
-
-    /* Parse message */ 
-    if (msg != NULL) {
-        GError *err;
-        gchar *debug_info;
-
-        switch (GST_MESSAGE_TYPE(msg)) {
-            case GST_MESSAGE_ERROR: 
-                gst_message_parse_error(msg, &err, &debug_info);
-                ERROR_FMT("Error received from element %s: %s\n", GST_OBJECT_NAME(msg->src), err->message);
-                ERROR_FMT("Debugging information: %s\n", debug_info ? debug_info: "none");
-                g_clear_error(&err);
-                g_free(debug_info);
-                break;
-            case GST_MESSAGE_EOS: 
-                DEBUG_PRINT("End-Of-Stream reached.\n");
-                break;
-            default: 
-                /* We should no reach this point because we only asked for ERRORs and EOS */
-                DEBUG_PRINT("Unexpected message received. \n");
-                break;
-        }
-        gst_message_unref(msg);
-    }
-
-    /* Free resources */
-    gst_object_unref(bus);
-    gst_element_set_state(handle.pipeline, GST_STATE_NULL);
-    gst_object_unref(handle.pipeline);
-    cleanup_shader_store();
+    /* Exit success*/ 
     return RET_OK;
+
+err: 
+    /* Clean allocated junk*/
+    cleanup_shader_store();
+    return RET_ERR;
 }  
 
-int main(int argc, char** argv) {
-   return test_pipeline(argc, argv);
+int read_cmd_line_params(int argc, char *argv[], PipelineConfig* out_config) {
+    GOptionContext  *context = NULL;
+    GError *error = NULL;
+
+    /* Set defaults*/
+    get_default_pipeline_config(out_config);
+
+    /* Define user switches */
+    #define INDENT_LEVEL "\t\t\t\t\t\t" // hack but couldn't find a better way
+    GOptionEntry entries[] = {
+        {"shader-pipeline", 'p', 0, G_OPTION_ARG_STRING, &out_config->shader_pipeline, 
+            "String which specifies the chain of shaders which should be applied to input stream\n" 
+            INDENT_LEVEL "(default: vertical_flip ! invert_color)\n" 
+            INDENT_LEVEL "Example: 'horizontal_flip ! invert_color ! crt_effect'\n", "SHADER_PIPELINE"}, 
+
+        {"dev-src", 'i', 0, G_OPTION_ARG_STRING, &out_config->dev_src, 
+            "String which specifies the path to the V4L2 capture device\n" 
+            INDENT_LEVEL "Example -i /dev/video<x> --dev-src=/dev/video<x>", "SRC_DEVICE"},
+        {"dev-sink", 'o', 0, G_OPTION_ARG_STRING, &out_config->dev_sink, 
+            "String which specifies the path to the V4L2 loopback device\n"
+            INDENT_LEVEL "Example: -o /dev/video<y> --out-device=/dev/video<y>\n", "SINK_DEVICE"}, 
+
+        {"out-width", 'w', 0, G_OPTION_ARG_INT, &out_config->out_width, 
+            "Integer which specifies the width of the scaled output video (default: <input_width>)\n"
+            INDENT_LEVEL "Example: -w 800 or  --out-width=800", "OUTPUT_WIDTH"},
+        {"out-height", 'h', 0, G_OPTION_ARG_INT, &out_config->out_height, 
+            "Integer which specifies the height of the scaled output video (default: <input_height>)\n"
+            INDENT_LEVEL "Example: -h 600 or --out-height=600\n", "OUTPUT_HEIGHT"},
+
+       {"bitrate", 0, 0, G_OPTION_ARG_INT, &out_config->bitrate, 
+            "Integer which specifies the bitrate of the h264 encoded stream (default: 2000)\n"
+            INDENT_LEVEL "Example: --bitrate=1000", "BITRATE"},
+        {"shader-src-path", 0, 0, G_OPTION_ARG_STRING, &out_config->shader_src_folder, 
+            "String which specifies the path to shaders source directory (default: ./shaders)\n" 
+            INDENT_LEVEL "Example: --shader-src-path=../shaders", "SHADER_SRC_PATH"},
+       {NULL}
+    };
+
+    /* Initialize GStreamer & parse entries */
+    context = g_option_context_new("Gstreamer testsrc scaling"); 
+    g_option_context_add_main_entries(context, entries, NULL);
+    g_option_context_add_group(context, gst_init_get_option_group());
+
+    if (!g_option_context_parse(context, &argc, &argv, &error)) {
+        ERROR_FMT("Failed to initialize: %s", error->message); 
+        g_clear_error(&error);
+        g_option_context_free(context);
+        return RET_ERR;
+    }
+
+    g_option_context_free(context);
+    return RET_OK;
 }
+    
+
