@@ -10,7 +10,10 @@
 
 static const char* map_pix_fmt_to_str[__PIX_FMT_MAX] = {
     [PIX_FMT_YUY2] = "YUY2",
-    [PIX_FMT_MJPG] = "MJPG", 
+    [PIX_FMT_MJPG] = "MJPG",
+    [PIX_FMT_RGB24] = "RGB", 
+    [PIX_FMT_BGR24] = "BGR",
+    [PIX_FMT_I420] = "I420",  
     [PIX_FMT_ERROR] = "ERROR"
 };
 const char* pixel_format_to_str(CamPixelFormat fmt) {
@@ -31,6 +34,9 @@ static CamPixelFormat convert_v4l2_pixelformat(unsigned int pixel_format) {
     debug_print_fourcc(pixel_format);
     switch(pixel_format) {
         case V4L2_PIX_FMT_YUYV: return PIX_FMT_YUY2;
+        case V4L2_PIX_FMT_YUV420: return PIX_FMT_I420;
+        case V4L2_PIX_FMT_RGB24: return PIX_FMT_RGB24;
+        case V4L2_PIX_FMT_BGR24: return PIX_FMT_BGR24;
         case V4L2_PIX_FMT_MJPEG: return PIX_FMT_MJPG;
         default: 
             ERROR("Unrecognized pixel format!");
@@ -62,7 +68,7 @@ int read_cam_params(const char* dev_path, CamParams *out_params) {
     out_params->width = fmt.fmt.pix.width;
     out_params->height = fmt.fmt.pix.height;
     out_params->pixelformat = convert_v4l2_pixelformat(fmt.fmt.pix.pixelformat);
-    
+
     /* Read framerate info*/
     strprm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(dev_fd, VIDIOC_G_PARM, &strprm) == -1) {

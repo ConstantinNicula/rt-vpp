@@ -28,12 +28,13 @@ int test_pipeline(int argc, char** argv) {
  
     /* Create the elements */
     get_default_pipeline_config(&pipeline_config);
-    pipeline_config.shader_pipeline = "horizontal_flip ! ripple_effect ! invert_color";
+    pipeline_config.shader_pipeline = "horizontal_flip ! ripple_effect ! invert_color ! drunk_effect ! crt_effect";
     pipeline_config.out_height = 900;
     pipeline_config.out_width = 900;
     pipeline_config.dev_sink = "/dev/video2";
     if (create_pipeline(&cam_params, &pipeline_config, &handle) != RET_OK) return RET_ERR; 
-   
+
+
     /* Start playing */
     ret = gst_element_set_state(handle.pipeline, GST_STATE_PLAYING);
     if (ret == GST_STATE_CHANGE_FAILURE) {

@@ -2,7 +2,10 @@
 #define __CAM_UTILS_H___
 
 typedef enum {
-    PIX_FMT_YUY2, 
+    PIX_FMT_YUY2,
+    PIX_FMT_RGB24, 
+    PIX_FMT_BGR24,
+    PIX_FMT_I420, 
     PIX_FMT_MJPG, 
     PIX_FMT_ERROR,
     __PIX_FMT_MAX

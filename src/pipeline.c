@@ -73,6 +73,9 @@ static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) 
     /* 2) Create capsfilter for source element & decoder */
     DEBUG_PRINT_FMT("GStreamer compatible source format %s\n", pixel_format_to_str(cam_params->pixelformat));
     switch (cam_params->pixelformat) {
+        case PIX_FMT_RGB24:
+        case PIX_FMT_BGR24:
+        case PIX_FMT_I420:
         case PIX_FMT_YUY2:
             handle->dec.cam_caps_filter = create_caps_filter("video/x-raw", "camera-capsfilter", 
                             pixel_format_to_str(cam_params->pixelformat), 
