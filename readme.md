@@ -17,6 +17,8 @@ The full processing pipeline contains four stages:
 
 A single v4l2 capture device was duplicated five times using v4l2loopback devices. For each of the five feeds a separate (independent) rt-vpp instance was used to process the video stream. Different configurations were used to showcase the shader effects in action. Refer to the `start_demo.sh` script for more info.
 
+[![Watch the video](https://github.com/ConstantinNicula/rt-vpp/blob/main/demo/thumbnail.png)](https://github.com/ConstantinNicula/rt-vpp/blob/main/demo/demo_short.mp4)
+
 Note: The non-trivial shader effects are slightly modified versions of existing shadertoy shaders. Modifications are limited to adjustments for uniform & varying shader attributes which are not directly compatible. I've added a link in the shader source files to the original shadertoy page.
 
 ## Usage
