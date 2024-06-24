@@ -43,12 +43,12 @@ start_cature_dup () {
 }
 
 sample_pipeline_args=(
-    "--shader-pipeline=\"passthrough\" --bitrate=3000"
-    "--shader-pipeline=\"passthrough!crt_effect\" --bitrate=3000"
-    "--shader-pipeline=\"vertical_flip!invert_color\" -w 800 -h 400 --bitrate=5000"
-    "--shader-pipeline=\"ascii_effect!vignette\" -w 640 -h 480 --bitrate=5000"
-    "--shader-pipeline=\"drunk_effect!crt_effect\" -w 640 -h 480 --bitrate=5000"
-    "--shader-pipeline=\"chromatical!vignette\" -w 640 -h 480 --bitrate=5000"
+    "--shader-pipeline=\"passthrough!crt_effect\" --bitrate=10000"
+    "--shader-pipeline=\"vertical_flip!invert_color\" -w 800 -h 400 --bitrate=10000"
+    "--shader-pipeline=\"ascii_effect!vignette\" -w 640 -h 480 --bitrate=10000"
+    "--shader-pipeline=\"drunk_effect!crt_effect\" -w 640 -h 480 --bitrate=10000"
+    "--shader-pipeline=\"chromatical!vignette\" -w 640 -h 480 --bitrate=10000"
+    "--shader-pipeline=\"passthrough\" --bitrate=10000"
 )
 
 out_devs_str="$(allocate_devices $2)"
@@ -66,7 +66,7 @@ pipeline_pids=()
 for i in $(seq 0 $(($2 - 1))); do
     # cmd_params='' 
     # echo Starting processing pipeline $i with params: $cmd_params ..
-    nohup ./build/video_streamer -i ${out_devs_arr[$i]} ${sample_pipeline_args[$i]} --shader-src-path=$SCRIPT_PATH/shaders > out_$i.log 2>&1 &
+    nohup ./build/rt-vpp -i ${out_devs_arr[$i]} ${sample_pipeline_args[$i]} --shader-src-path=$SCRIPT_PATH/shaders > out_$i.log 2>&1 &
     pipeline_pids+=("$!")
 done
 

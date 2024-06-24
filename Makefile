@@ -1,5 +1,5 @@
 # Project configuration params
-TARGET_NAME = video_streamer 
+TARGET_NAME = rt-vpp 
 LIBS = -lm 
 CC = gcc 
 CFLAGS = -g -Wall 

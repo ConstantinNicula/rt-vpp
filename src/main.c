@@ -80,7 +80,7 @@ int read_cmd_line_params(int argc, char *argv[], PipelineConfig* out_config) {
     };
 
     /* Initialize GStreamer & parse entries */
-    context = g_option_context_new("Gstreamer testsrc scaling"); 
+    context = g_option_context_new("RealTime Video Processing Pipeline"); 
     g_option_context_add_main_entries(context, entries, NULL);
     g_option_context_add_group(context, gst_init_get_option_group());
 
