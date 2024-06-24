@@ -70,11 +70,11 @@ Note: All defined transformation have an associated shader which can be found in
     ./build/rt-vpp -i /dev/video0 -p "vignette ! crt_effect" -o /dev/video2
     ```
 
-    Refer to section 'Extras/Connecting to V4L2 loopback device' node for more info about how you can preview the `/dev/video2` feed.
+    Refer to section 'Extras/Displaying from a V4L2 loopback device' node for more info about how you can preview the `/dev/video2` feed.
 
 ## Dependencies
 
-[Mandatory] Gstreamer is the backbone of the processing pipeline so it must be installed, on Ubuntu/Debian you can run the following command (Note: this is a full installation, not all plugins are necessary but I was to lazy manually check what the minimal config is):
+[Mandatory] Gstreamer is the backbone of the processing pipeline so it must be installed, on Ubuntu/Debian you can run the following command (Note: this is a full installation, not all plugins are necessary but I was too lazy to manually check what the minimal config is):
 
 ```bash
 sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
@@ -112,7 +112,7 @@ If the build succeeds you binary named `rt-vpp` is generated in `<clone-repo-pat
 
 ## Extras
 
-### Finding a V4L2 capture devices
+### Finding a V4L2 capture device
 
 Use v4l2-ctl to find a list of valid capture devices:
 
@@ -157,7 +157,7 @@ Format Video Capture:
     Flags             : 
 ```
 
-### Creating a V4L2 loopback device node
+### Creating a V4L2 loopback device
 
 This will be used as the output for the pipeline. You can create loopback device by running the following command:
 
@@ -167,7 +167,7 @@ sudo modprobe v4l2loopback devices=1
 
 Check `/dev/video*` for new devices.
 
-### Connecting to V4L2 loopback device node
+### Displaying from a V4L2 loopback device
 
 You can preview the virtual camera data using gstreamer:
 
