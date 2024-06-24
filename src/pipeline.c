@@ -7,6 +7,7 @@
 #include "shader_utils.h"
 #include <time.h>
 
+
 static int create_decoding_stage(PipelineHandle *handle, CamParams *cam_params);
 static int create_processing_stage(PipelineHandle *handle, CamParams* cam_params, PipelineConfig* pipeline_config);
 static int create_encoding_stage(PipelineHandle *handle, PipelineConfig* pipeline_config);
@@ -17,7 +18,11 @@ static GstElement* create_caps_filter(const char* type, const char* name, const 
                                         int width, int height, int fr_num, int fr_denom);
 static int create_shader_pipeline_from_string(PipelineHandle *handle, const char* shader_pipeline);
 static GstElement* create_shader(const char* shader_name); 
+
+//#define DEBUT_SHOW_CAPS
+#ifdef DEBUG_SHOW_CAPS
 static void debug_print_caps(GstElement* elem, const char* pad);
+#endif
 
 void get_default_pipeline_config(PipelineConfig *out_pipeline_config) {
     *out_pipeline_config = (PipelineConfig){
@@ -36,7 +41,7 @@ int create_pipeline(CamParams *cam_params, PipelineConfig *pipeline_config, Pipe
     gboolean link_res = FALSE;
 
     /* 1) Create the empty pipeline */
-    handle->pipeline = gst_pipeline_new("my-test-pipeline");
+    handle->pipeline = gst_pipeline_new("processing-pipeline");
     CHECK(handle->pipeline != NULL, "Failed to create pipeline", RET_ERR);
 
     /* 2) Create stages */    
@@ -231,8 +236,9 @@ static int create_processing_stage(PipelineHandle *handle, CamParams* cam_params
     }
     gst_element_link_many(handle->proc.shader_stages[num_shaders-1], handle->proc.downloader, 
                         handle->proc.scaler, handle->proc.out_caps_filter, NULL);
-
+#ifdef DEBUT_SHOW_CAPS
     debug_print_caps(handle->proc.scaler, "sink");
+#endif
     return RET_OK;
 }
 
@@ -321,8 +327,11 @@ static int create_output_stage(PipelineHandle *handle, PipelineConfig *pipeline_
                                 handle->out.disp_converter, handle->out.disp_sink, NULL);
     CHECK(ret != FALSE, "Failed to link elements in output stage: screen sink", RET_ERR);
 
+#ifdef DEBUT_SHOW_CAPS
     debug_print_caps(handle->out.disp_converter, "src");
     debug_print_caps(handle->out.disp_sink, "sink");
+#endif
+
     if (pipeline_config->dev_sink) {
         ret = gst_element_link_many(handle->out.tee, handle->out.dev_queue, handle->out.dev_sink, NULL);
         CHECK(ret != FALSE, "Failed to link elements in output stage: dev sink", RET_ERR);
@@ -410,8 +419,10 @@ static GstElement* create_shader(const char* shader_name) {
 }
 
 
+// Only doing this to avoid annoying build warning :0
+#ifdef DEBUT_SHOW_CAPS
 static void debug_print_caps(GstElement* elem, const char* pad) {
     GstCaps *caps = gst_pad_query_caps(gst_element_get_static_pad(elem, pad), NULL);
     DEBUG_PRINT_FMT("%s caps: %s\n", pad, gst_caps_to_string(caps));
 }
-
+#endif
