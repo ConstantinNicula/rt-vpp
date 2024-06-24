@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
 
     /* Parse command line args */
     if (read_cmd_line_params(argc, argv, &pipeline_config) != RET_OK) return RET_ERR;
-
+    DEBUG_PRINT_FMT("MAIN: %s\n", pipeline_config.shader_pipeline);
     /* Initialize shader stuff */
     init_shader_store();
     DEBUG_PRINT_FMT("Loading shaders from %s\n", pipeline_config.shader_src_folder);
