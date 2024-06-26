@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Usage ./strat_demo.sh <input device> <num_streams_to_create> 
+# Eg. input_device = /dev/video0 
+# Eg. num_streams_to_create = 5 (valid rage: [1..5])
+
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")"; pwd -P ) 
 
 allocate_devices () {
@@ -44,29 +48,41 @@ start_cature_dup () {
 
 sample_pipeline_args=(
     "--shader-pipeline=\"passthrough!crt_effect\" --bitrate=10000"
-    "--shader-pipeline=\"vertical_flip!invert_color\" -w 800 -h 400 --bitrate=10000"
+    "--shader-pipeline=\"vertical_flip!invert_color\" -w 640 -h 480 --bitrate=10000"
     "--shader-pipeline=\"ascii_effect!vignette\" -w 640 -h 480 --bitrate=10000"
     "--shader-pipeline=\"drunk_effect!crt_effect\" -w 640 -h 480 --bitrate=10000"
     "--shader-pipeline=\"chromatical!vignette\" -w 640 -h 480 --bitrate=10000"
     "--shader-pipeline=\"passthrough\" --bitrate=10000"
 )
 
+# cleanup previous logs
+rm out_*.log
+
+# allocate new devices 
 out_devs_str="$(allocate_devices $2)"
 echo Created $2 devices: $out_devs_str ..
 
+# start duplicating input stream to new devices
 dup_pid=$(start_cature_dup $1 $2 $out_devs_str)
 echo Starting GStreamer virtual cam duplication @ PID: $dup_pid
 
+# wait a bit
 sleep 1 
+
+# spawn rt-vpp processing instances
 
 echo Start demo pipelines on each device
 IFS=' ' read -r -a out_devs_arr <<< "$out_devs_str"
 
+# uncomment to enable debugging
+export DISPLAY=:0
+export GST_DEBUG=3
+
 pipeline_pids=()
 for i in $(seq 0 $(($2 - 1))); do
-    # cmd_params='' 
     # echo Starting processing pipeline $i with params: $cmd_params ..
     nohup ./build/rt-vpp -i ${out_devs_arr[$i]} ${sample_pipeline_args[$i]} --shader-src-path=$SCRIPT_PATH/shaders > out_$i.log 2>&1 &
+    echo "nohup ./build/rt-vpp -i ${out_devs_arr[$i]} ${sample_pipeline_args[$i]} --shader-src-path=$SCRIPT_PATH/shaders > out_$i.log 2>&1 &"
     pipeline_pids+=("$!")
 done
 
