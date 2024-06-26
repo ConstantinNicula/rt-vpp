@@ -16,7 +16,7 @@ typedef struct _PipelineHandle {
         GstElement* cam_source; 
         /* Enforces correct camera capture settings */ 
         GstElement* cam_caps_filter; 
-        /*Optional: only relevant for MJPEG streams which require dedicated decoder*/
+        /* Optional: only relevant for MJPEG streams which require dedicated decoder*/ 
         GstElement* decoder;     
         /* Converter section ensures that output of front end pipeline source
         is compatible with `glupload` sink*/

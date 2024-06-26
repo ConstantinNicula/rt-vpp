@@ -102,7 +102,7 @@ int play_pipeline(PipelineHandle *handle) {
                 ERROR_FMT("Debugging information: %s\n", debug_info ? debug_info: "none");
                 g_clear_error(&err);
                 g_free(debug_info);
-                break;
+                return RET_ERR; 
             case GST_MESSAGE_EOS: 
                 DEBUG_PRINT("End-Of-Stream reached.\n");
                 break;
@@ -128,7 +128,7 @@ static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) 
     CHECK(handle->dec.cam_source != NULL, "Failed to allocate v4l2src element", RET_ERR);
     g_object_set(G_OBJECT(handle->dec.cam_source), 
                 "device", cam_params->dev_path, NULL);
-    
+
     /* 2) Create capsfilter for source element & decoder */
     DEBUG_PRINT_FMT("GStreamer compatible source format %s\n", pixel_format_to_str(cam_params->pixelformat));
     switch (cam_params->pixelformat) {
@@ -169,7 +169,7 @@ static int create_decoding_stage(PipelineHandle* handle, CamParams* cam_params) 
     
     /* 5) Add front end elements to pipeline */ 
     gst_bin_add_many(GST_BIN(handle->pipeline), 
-                     handle->dec.cam_source, 
+                     handle->dec.cam_source,
                      handle->dec.cam_caps_filter,
                      handle->dec.converter, 
                      handle->dec.out_caps_filter,

@@ -38,6 +38,7 @@ int main(int argc, char *argv[]) {
 err: 
     /* Clean allocated junk*/
     cleanup_shader_store();
+    cleanup_cam_params(&cam_params);
     return RET_ERR;
 }  
 

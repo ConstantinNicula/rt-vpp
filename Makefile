@@ -2,7 +2,8 @@
 TARGET_NAME = rt-vpp 
 LIBS = -lm 
 CC = gcc 
-CFLAGS = -g -Wall 
+CFLAGS = -g -Wall #-fsanitize=address,undefined
+
 # Get compiler and linker flags for gstreamer
 DEPS = `pkg-config --cflags --libs gstreamer-1.0`
 
