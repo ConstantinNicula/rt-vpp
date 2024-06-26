@@ -60,7 +60,7 @@ Note: All defined transformation have an associated shader which can be found in
 
 ### Typical use-cases
 
-1) Read from capture device `/dev/video0`, invert the colors, apply a vertical flip, scale 800x600:
+1) Read from capture device `/dev/video0`, invert the colors, apply a horizontal flip, scale 800x600:
 
     ```bash
     ./build/rt-vpp -i /dev/video0 -p "invert_color ! horizontal_flip" -w 800 -h 600
@@ -110,7 +110,7 @@ cd <cloned-repo-path>
 make
 ```
 
-If the build succeeds you binary named `rt-vpp` is generated in `<clone-repo-path>/build/`.
+If the build succeeds a binary named `rt-vpp` is generated in `<clone-repo-path>/build/`.
 
 ## Extras
 
